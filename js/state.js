@@ -20,6 +20,16 @@ function clean(text) {
   return String(text == null ? '' : text).trim().slice(0, MAX_TASK_LEN);
 }
 
+function clampCapacity(n) {
+  const v = parseInt(n, 10);
+  return Math.max(CAPACITY_MIN, Math.min(CAPACITY_MAX, isNaN(v) ? DEFAULTS.capacity : v));
+}
+
+function clampVolume(v) {
+  const n = parseFloat(v);
+  return Math.max(0, Math.min(1, isNaN(n) ? DEFAULTS.volume : n));
+}
+
 // Fisher-Yates. `rand` is injected so tests can make shuffles reproducible.
 function shuffleInPlace(arr, rand) {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -125,8 +135,7 @@ class DuckPondState {
   // ---- settings ----
 
   setCapacity(n) {
-    const v = parseInt(n, 10);
-    this.capacity = Math.max(CAPACITY_MIN, Math.min(CAPACITY_MAX, isNaN(v) ? DEFAULTS.capacity : v));
+    this.capacity = clampCapacity(n);
     this.notify();
   }
 
@@ -136,8 +145,7 @@ class DuckPondState {
   }
 
   setVolume(v) {
-    const n = parseFloat(v);
-    this.volume = Math.max(0, Math.min(1, isNaN(n) ? DEFAULTS.volume : n));
+    this.volume = clampVolume(v);
     this.notify();
   }
 
@@ -167,7 +175,7 @@ class DuckPondState {
 
     if (typeof saved.capacity === 'number') this.setCapacityQuiet(saved.capacity);
     if (saved.onDismiss) this.onDismiss = saved.onDismiss === 'pile' ? 'pile' : 'done';
-    if (typeof saved.volume === 'number') this.volume = Math.max(0, Math.min(1, saved.volume));
+    if (typeof saved.volume === 'number') this.volume = clampVolume(saved.volume);
 
     // Stored tasks can be stale or hand-edited, so backfill anything missing
     // and drop anything that is not shaped like a task.
@@ -185,8 +193,7 @@ class DuckPondState {
 
   // load() must not write back to storage while reading it.
   setCapacityQuiet(n) {
-    const v = parseInt(n, 10);
-    this.capacity = Math.max(CAPACITY_MIN, Math.min(CAPACITY_MAX, isNaN(v) ? DEFAULTS.capacity : v));
+    this.capacity = clampCapacity(n);
   }
 }
 

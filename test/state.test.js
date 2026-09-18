@@ -133,8 +133,14 @@ test('a save and load round-trip preserves tasks and settings', () => {
 test('corrupt storage does not throw and yields an empty pile', () => {
   const storage = memStorage();
   storage.setItem('duckpond', '{not json at all');
-  const s = new DuckPondState({ storage, rand: seeded(1) });
-  assert.deepStrictEqual(s.tasks, []);
+  const oldError = console.error;
+  try {
+    console.error = () => {};
+    const s = new DuckPondState({ storage, rand: seeded(1) });
+    assert.deepStrictEqual(s.tasks, []);
+  } finally {
+    console.error = oldError;
+  }
 });
 
 test('deleteTask removes the task entirely', () => {
