@@ -1,26 +1,69 @@
 // Duck Pond — page wiring. Task 9 fills this out; this much gets ducks swimming.
+function render() { /* filled in by the drawer task */ }
+
 document.addEventListener('DOMContentLoaded', () => {
-  const state = new window.DuckPondState({});
   window.Sprites.preload().then(() => {
-    window.scene.init(document.getElementById('sceneCanvas'));
-    window.pond.init({
-      container: document.getElementById('ducks'),
-      state,
-      onCatch: task => console.log('caught:', task.text)
+    const state = new window.DuckPondState({});
+    const ducksEl = document.getElementById('ducks');
+    const card = document.getElementById('revealCard');
+    const cardText = document.getElementById('revealText');
+    const btnDone = document.getElementById('btnDone');
+    const btnNotNow = document.getElementById('btnNotNow');
+    const emptyHint = document.getElementById('emptyHint');
+
+    let refillTimer = null;
+
+    // Walk-ins are staggered so a group does not stampede in together.
+    function refill() {
+      if (refillTimer) return;
+      if (!state.canRefill) { updateEmptyHint(); return; }
+      const task = state.takeFromPile();
+      if (!task) { updateEmptyHint(); return; }
+      window.pond.spawn(task, true);
+      updateEmptyHint();
+      refillTimer = setTimeout(() => { refillTimer = null; refill(); }, 400);
+    }
+
+    function updateEmptyHint() {
+      emptyHint.hidden = state.tasks.some(t => t.state !== 'done');
+    }
+
+    function showCard(task) {
+      cardText.textContent = task.text;
+      card.hidden = false;
+      btnDone.focus();
+    }
+
+    // resolveAs is true for done, false for back in the pile.
+    function hideCard(resolveAs) {
+      const id = state.heldId;
+      card.hidden = true;
+      if (!id) return;
+      state.resolve(id, resolveAs);
+      window.pond.release();
+      refill();
+      render();
+    }
+
+    btnDone.addEventListener('click', () => hideCard(true));
+    btnNotNow.addEventListener('click', () => hideCard(false));
+
+    // Dismissing without choosing follows the On dismiss setting.
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && !card.hidden) hideCard(state.onDismiss === 'done');
     });
 
-    // Seed some tasks so there is something to look at.
-    if (state.tasks.length === 0) {
-      ['Wash the dishes', 'Email the landlord', '15 minute walk', 'Pay the water bill',
-       'Book dentist', 'Fold laundry'].forEach(t => state.addTask(t));
-    }
+    window.scene.init(document.getElementById('sceneCanvas'));
+    window.pond.init({ container: ducksEl, state, onCatch: showCard });
+
+    // On load, ducks are already floating — no walk-in animation.
     while (state.canRefill) {
       const t = state.takeFromPile();
       if (!t) break;
       window.pond.spawn(t, false);
     }
+    updateEmptyHint();
     window.pond.start();
+    window.addEventListener('resize', () => window.pond.resize());
   });
-
-  window.addEventListener('resize', () => window.pond.resize());
 });
