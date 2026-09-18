@@ -112,7 +112,6 @@ Three sprite sheets by [CazBee](https://caz-bee.itch.io/), all
 |---|---|---|
 | `ducky_2_spritesheet.png` | https://caz-bee.itch.io/ducky-2 | CC0 |
 | `ducky_3_spritesheet.png` | https://caz-bee.itch.io/ducky-3 | CC0 |
-| `ducky-idle.png`, `ducky-walk.png` | https://caz-bee.itch.io/ducky | CC0 |
 
 `ducky_2` and `ducky_3` are pixel-identical frames with different palettes, so
 they cost nothing extra to support.
@@ -157,10 +156,14 @@ Row frame counts vary by sheet, so each sheet declares its own in `js/sprites.js
 rather than sharing one table. A sheet whose row is shorter must never step past
 its last frame into the empty cells beside it.
 
-`ducky-walk.png` (4 frames) and `ducky-idle.png` (2 frames) are 48 × 48 cells in
-a single row — larger versions of the duckling. They are **not used** in the
-first release; the 32px sheets carry every animation we need. They stay in the
-repository as alternatives.
+The https://caz-bee.itch.io/ducky pack (`ducky-idle.png`, `ducky-walk.png`) is
+**not used and not in the repository**. Its cells are 48 × 48 in a single row
+rather than a 6 × 4 grid of 32px cells, so it would need its own geometry for no
+gain — the three 32px sheets carry every animation we need. Shipping art nothing
+loads is just weight.
+
+Every sheet in `assets/ducks/` is therefore loadable by `js/sprites.js`, and that
+is worth keeping true.
 
 ### Animation constants
 
