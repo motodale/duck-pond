@@ -1,5 +1,4 @@
 // Duck Pond — page wiring. Task 9 fills this out; this much gets ducks swimming.
-function render() { /* filled in by the drawer task */ }
 
 document.addEventListener('DOMContentLoaded', () => {
   window.Sprites.preload().then(() => {
@@ -88,5 +87,104 @@ document.addEventListener('DOMContentLoaded', () => {
     updateEmptyHint();
     window.pond.start();
     window.addEventListener('resize', () => window.pond.resize());
+
+    const drawer = document.getElementById('drawer');
+    const drawerToggle = document.getElementById('drawerToggle');
+    const taskList = document.getElementById('taskList');
+    const historyList = document.getElementById('historyList');
+    const capacityInput = document.getElementById('capacityInput');
+    const capacityVal = document.getElementById('capacityVal');
+    const dismissSelect = document.getElementById('dismissSelect');
+    const volumeInput = document.getElementById('volumeInput');
+    const volumeVal = document.getElementById('volumeVal');
+    const addForm = document.getElementById('addForm');
+    const addInput = document.getElementById('addInput');
+
+    const BADGE = { pond: 'in pond', pile: 'waiting', done: 'done' };
+
+    function render() {
+      // Task list: everything still in play, pond tasks included. Opening this
+      // drawer is what spoils the surprise, which is why it starts closed.
+      taskList.replaceChildren();
+      state.tasks
+        .filter(t => t.state !== 'done')
+        .forEach(t => {
+          const li = document.createElement('li');
+
+          const badge = document.createElement('span');
+          badge.className = 'badge';
+          badge.textContent = BADGE[t.state];
+
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.value = t.text;
+          input.maxLength = 100;
+          input.setAttribute('aria-label', 'Edit task');
+          input.addEventListener('change', () => { state.editTask(t.id, input.value); render(); });
+
+          const del = document.createElement('button');
+          del.type = 'button';
+          del.textContent = '✕';
+          del.setAttribute('aria-label', 'Delete task: ' + t.text);
+          del.addEventListener('click', () => deleteTask(t.id));
+
+          li.append(badge, input, del);
+          taskList.appendChild(li);
+        });
+
+      // History: most recently finished first.
+      historyList.replaceChildren();
+      state.tasksIn('done')
+        .slice()
+        .sort((a, b) => b.doneAt - a.doneAt)
+        .slice(0, 50)
+        .forEach(t => {
+          const li = document.createElement('li');
+          const when = new Date(t.doneAt)
+            .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          li.textContent = t.text + ' — ' + when;
+          historyList.appendChild(li);
+        });
+
+      capacityInput.value = state.capacity;
+      capacityVal.textContent = state.capacity + ' ducks';
+      dismissSelect.value = state.onDismiss;
+      volumeInput.value = Math.round(state.volume * 100);
+      volumeVal.textContent = Math.round(state.volume * 100) + '%';
+      updateEmptyHint();
+    }
+
+    drawerToggle.addEventListener('click', () => {
+      const open = drawer.hidden;
+      drawer.hidden = !open;
+      drawerToggle.setAttribute('aria-expanded', String(open));
+      if (open) drawer.querySelector('input, button, select').focus();
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && !drawer.hidden) {
+        drawer.hidden = true;
+        drawerToggle.setAttribute('aria-expanded', 'false');
+        drawerToggle.focus();
+      }
+    });
+
+    addForm.addEventListener('submit', e => {
+      e.preventDefault();
+      if (!state.addTask(addInput.value)) return;
+      addInput.value = '';
+      refill();
+      render();
+    });
+
+    capacityInput.addEventListener('input', () => { state.setCapacity(capacityInput.value); refill(); render(); });
+    dismissSelect.addEventListener('change', () => { state.setOnDismiss(dismissSelect.value); render(); });
+    volumeInput.addEventListener('input', () => {
+      state.setVolume(volumeInput.value / 100);
+      if (window.audio) window.audio.setVolume(state.volume);
+      render();
+    });
+
+    render();
   });
 });
