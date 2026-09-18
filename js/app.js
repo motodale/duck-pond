@@ -56,10 +56,15 @@ document.addEventListener('DOMContentLoaded', () => {
     window.scene.init(document.getElementById('sceneCanvas'));
     window.pond.init({ container: ducksEl, state, onCatch: showCard });
 
-    window.audio.setVolume(state.volume);
-    ['pointerdown', 'keydown'].forEach(ev => {
-      document.addEventListener(ev, () => window.audio.unlock(), { once: true });
-    });
+    // Guarded as a whole block. Audio is decorative; a failed audio.js load must
+    // never abort the rest of the bootstrap. Unguarded, a TypeError here would
+    // stop the duck spawning, the frame loop and the resize wiring that follow.
+    if (window.audio) {
+      window.audio.setVolume(state.volume);
+      ['pointerdown', 'keydown'].forEach(ev => {
+        document.addEventListener(ev, () => window.audio.unlock(), { once: true });
+      });
+    }
 
     // On load, ducks are already floating — no walk-in animation.
     while (state.canRefill) {
