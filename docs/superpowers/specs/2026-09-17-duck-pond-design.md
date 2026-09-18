@@ -133,8 +133,8 @@ README records the same facts so anyone reading the repository sees them.
 **Behaviour.** He is a normal duck in every respect — same animations, same
 catching, same exits, holds a task like any other. He simply appears rarely:
 each newly spawned duck has a **2% chance** of being the gentleman instead of one
-of the three common skins. Nothing else marks him out and nothing announces him.
-Finding one is the whole joke.
+of the two common skins (`ducky_2`, `ducky_3`). Nothing else marks him out and
+nothing announces him. Finding one is the whole joke.
 
 **One difference to handle:** his row 2 (quack) holds **2 frames** where the
 other sheets hold 4. Frame counts are therefore per-sheet metadata, not a shared
