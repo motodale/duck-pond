@@ -54,10 +54,18 @@ These apply to every part of the build.
    to the history. Not now returns it to the pile, where it is reshuffled and may
    surface again inside a later duck.
 
-   Both buttons are always on the card. The **On reveal** setting only decides
-   what happens when you dismiss the card *without* choosing — by pressing Escape,
-   or clicking away. That dismissal is treated as Done or as Not now according to
-   the setting. The setting never hides or disables either button.
+   Both buttons are always on the card. The **On dismiss** setting only decides
+   what happens when you dismiss the card *without* choosing, which means pressing
+   Escape. That dismissal is treated as Done or as Not now according to the
+   setting. The setting never hides or disables either button.
+
+   **Clicking away does not dismiss the card, deliberately.** The pond fills the
+   viewport and clicking it is the app's primary gesture, so a click-to-dismiss
+   would fire constantly by accident — every missed grab at a duck would resolve
+   the open task, and under the default setting that silently marks it done
+   without the user having read it. Escape plus two explicit buttons covers
+   dismissal without putting a destructive action under the same gesture people
+   use most.
 6. The pond refills, and a new duck walks in from the right.
 
 Only one task can be revealed at a time. While a task is on the card, the other
