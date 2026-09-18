@@ -1,4 +1,4 @@
-// Duck Pond — page wiring. Task 9 fills this out; this much gets ducks swimming.
+// Duck Pond — page wiring: bootstrap, add-task, drawer, reveal card, settings, history.
 
 document.addEventListener('DOMContentLoaded', () => {
   window.Sprites.preload().then(() => {
@@ -28,8 +28,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showCard(task) {
-      cardText.textContent = task.text;
+      // Unhide before setting the text: the card holds the live region, and a
+      // screen reader only announces a content change while the element is
+      // already in the accessibility tree. Setting text first, then unhiding,
+      // means several screen readers announce nothing.
       card.hidden = false;
+      cardText.textContent = task.text;
       btnDone.focus();
     }
 
@@ -85,6 +89,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // On load, ducks are already floating — no walk-in animation.
+    // Tasks persisted as 'pond' already hold their slot, so give each one its
+    // duck back BEFORE topping up from the pile. Without this they occupy
+    // capacity with nothing on screen, canRefill is false forever, and the pond
+    // is dead for the life of the browser profile.
+    state.tasksIn('pond').forEach(t => window.pond.spawn(t, false));
+
     while (state.canRefill) {
       const t = state.takeFromPile();
       if (!t) break;

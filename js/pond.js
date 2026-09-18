@@ -25,8 +25,10 @@ const pond = {
     window.scene.setReducedMotion(this.reduced);
   },
 
-  count() { return this.ducks.filter(d => d.mode === 'swim').length; },
-  byTaskId(id) { return this.ducks.find(d => d.taskId === id) || null; },
+  // Skips a duck mid-exit: it can share taskId with a freshly-spawned
+  // replacement for up to ~2.4s (quack, then exit), and callers here want the
+  // live duck, not the one on its way out.
+  byTaskId(id) { return this.ducks.find(d => d.taskId === id && d.mode !== 'exit') || null; },
 
   // ---- creating ----
 
@@ -61,6 +63,10 @@ const pond = {
     el.type = 'button';
     el.className = 'duck';
     el.setAttribute('aria-label', 'Duck hiding a task');   // never the task text
+    // A walking-in duck cannot be caught until it reaches the water — catch()
+    // rejects it anyway, but leaving it enabled put a dead focus stop/hover
+    // target in the tab order for the ~1.5s of its walk-in.
+    el.disabled = !!walkIn;
     const spr = document.createElement('div');
     spr.className = 'duck-spr';
     el.appendChild(spr);
@@ -135,10 +141,23 @@ const pond = {
     // A smaller window can leave ducks outside the new water ellipse.
     const w = window.scene.water();
     this.ducks.forEach(d => {
-      if (d.mode !== 'swim' || window.scene.contains(d.x, d.y)) return;
-      const ang = Math.atan2(d.y - w.cy, d.x - w.cx);
-      d.x = w.cx + Math.cos(ang) * w.rx * 0.8;
-      d.y = w.cy + Math.sin(ang) * w.ry * 0.8;
+      if (d.mode === 'swim') {
+        if (window.scene.contains(d.x, d.y)) return;
+        const ang = Math.atan2(d.y - w.cy, d.x - w.cx);
+        d.x = w.cx + Math.cos(ang) * w.rx * 0.8;
+        d.y = w.cy + Math.sin(ang) * w.ry * 0.8;
+      } else if (d.mode === 'enter') {
+        // An entering duck's tx/ty were aimed at the pre-resize ellipse. Left
+        // alone on a shrink, it walks to a point now outside the water, flips
+        // to 'swim' there, and stepSwim's bounce only reverses velocity (it
+        // never steers back in) — so it can freeze on the grass for the rest
+        // of the session. Re-aim the target the same way a swimming duck gets
+        // nudged back in.
+        if (window.scene.contains(d.tx, d.ty)) return;
+        const ang = Math.atan2(d.ty - w.cy, d.tx - w.cx);
+        d.tx = w.cx + Math.cos(ang) * w.rx * 0.8;
+        d.ty = w.cy + Math.sin(ang) * w.ry * 0.8;
+      }
     });
     this.ducks.forEach(d => this.applyCrop(d, window.Sprites.scale()));
   },

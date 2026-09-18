@@ -34,7 +34,7 @@ The whole app works without a mouse.
 |---|---|
 | Tab / Shift+Tab | Moves focus between ducks (each is a real button in the page's tab order) |
 | Enter or Space (duck focused) | Catches the focused duck, same as clicking it |
-| Escape | Dismisses the reveal card if it's open (see the Controls table), otherwise closes the drawer if it's open and returns focus to the "Tasks & settings" button |
+| Escape | Dismisses the reveal card if it's open (see the Controls table) **and** closes the drawer if it's open, returning focus to the "Tasks & settings" button. The two handlers are independent and both fire on the same press, so with card and drawer both open, one Escape does both |
 
 The drawer's task list is a complete alternative to catching ducks: every
 task's text is visible and editable there directly, with no need to catch a

@@ -158,6 +158,13 @@ test('editTask changes text and applies the same trim and cap', () => {
   assert.ok(!s.tasks[0].text.startsWith(' '));
 });
 
+test('a brand-new state starts with the documented defaults', () => {
+  const s = fresh();
+  assert.strictEqual(s.capacity, 12);
+  assert.strictEqual(s.onDismiss, 'done');
+  assert.strictEqual(s.volume, 0.7);
+});
+
 test('shuffleInPlace keeps every element', () => {
   const arr = [1, 2, 3, 4, 5, 6, 7, 8];
   shuffleInPlace(arr, seeded(9));
