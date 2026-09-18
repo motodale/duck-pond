@@ -126,7 +126,18 @@ const pond = {
     requestAnimationFrame(step);
   },
 
-  resize() { window.scene.resize(); },
+  resize() {
+    window.scene.resize();
+    // A smaller window can leave ducks outside the new water ellipse.
+    const w = window.scene.water();
+    this.ducks.forEach(d => {
+      if (d.mode !== 'swim' || window.scene.contains(d.x, d.y)) return;
+      const ang = Math.atan2(d.y - w.cy, d.x - w.cx);
+      d.x = w.cx + Math.cos(ang) * w.rx * 0.8;
+      d.y = w.cy + Math.sin(ang) * w.ry * 0.8;
+    });
+    this.ducks.forEach(d => this.applyCrop(d, window.Sprites.scale()));
+  },
 
   frame(t) {
     const S = window.Sprites, sc = S.scale();

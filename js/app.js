@@ -40,6 +40,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!id) return;
       state.resolve(id, resolveAs);
       window.pond.release();
+      // Focus would otherwise be lost to <body> when the card's buttons vanish.
+      addInput.focus();
       refill();
       render();
     }
