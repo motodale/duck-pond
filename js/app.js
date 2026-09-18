@@ -56,6 +56,11 @@ document.addEventListener('DOMContentLoaded', () => {
     window.scene.init(document.getElementById('sceneCanvas'));
     window.pond.init({ container: ducksEl, state, onCatch: showCard });
 
+    window.audio.setVolume(state.volume);
+    ['pointerdown', 'keydown'].forEach(ev => {
+      document.addEventListener(ev, () => window.audio.unlock(), { once: true });
+    });
+
     // On load, ducks are already floating — no walk-in animation.
     while (state.canRefill) {
       const t = state.takeFromPile();

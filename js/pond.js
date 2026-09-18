@@ -96,7 +96,7 @@ const pond = {
     d.mode = 'quack';
     d.anim = 'quack'; d.frame = 0; d.frameAcc = 0; d.t = 0;
     window.scene.ripple(d.x, d.y + 12, { r: 3, alpha: 0.7, grow: 0.5, fade: 0.016, width: 2 });
-    if (window.audio) window.audio.quack();
+    if (window.audio) { window.audio.quack(); window.audio.splash(); }
     if (this.onCatch) this.onCatch(task);
   },
 

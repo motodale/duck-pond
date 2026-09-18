@@ -54,7 +54,7 @@ broken on Node 24.
 | `js/app.js` | Page wiring: add-task, drawer, reveal card, settings, history. |
 | `test/state.test.js` | Node test-runner suite for `state.js`. |
 | `assets/ducks/*.png` | CazBee sprite sheets. Already committed. |
-| `assets/audio/*.ogg` | Freesound quacks. Task 8 acquires these. |
+| `assets/audio/*.ogg` | Freesound quacks. Not included; see Asset credits. |
 | `README.md` | What it does, how to run it, full asset credits and licences. |
 | `LICENSE` | GPL-3.0. |
 
@@ -83,6 +83,21 @@ repository owner has accepted this knowingly and owns resolving it.
 
 All three are CC0. CC0 requires no attribution, but all sources are credited
 here anyway.
+
+The `.ogg` files above are not included in this repository. Freesound
+requires a free account to download a sound, so the app ships without them.
+Without them, the app runs fine and simply does not quack; the splash sound
+is synthesized and needs no file, so the app is not silent.
+
+To enable quacks, create a free Freesound account, download each source
+file, and convert it with `ffmpeg`:
+
+```bash
+mkdir -p assets/audio
+ffmpeg -i ~/Downloads/418509.wav -ac 1 -ar 22050 -c:a libvorbis -q:a 2 assets/audio/quack-1.ogg
+ffmpeg -i ~/Downloads/791152.wav -ac 1 -ar 22050 -c:a libvorbis -q:a 2 assets/audio/quack-2.ogg
+ffmpeg -i ~/Downloads/719115.wav -ac 1 -ar 22050 -c:a libvorbis -q:a 2 assets/audio/quack-3.ogg
+```
 
 ## Licence
 
