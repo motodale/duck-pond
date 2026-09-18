@@ -41,7 +41,11 @@ document.addEventListener('DOMContentLoaded', () => {
       state.resolve(id, resolveAs);
       window.pond.release();
       // Focus would otherwise be lost to <body> when the card's buttons vanish.
-      addInput.focus();
+      // Put it back on a duck rather than the add-task field: it keeps a keyboard
+      // user in the pond where they were, and stops a text input summoning the
+      // virtual keyboard on mobile every single time a task is resolved.
+      const nextDuck = ducksEl.querySelector('.duck:not([disabled])');
+      if (nextDuck) nextDuck.focus(); else addInput.focus();
       refill();
       render();
     }

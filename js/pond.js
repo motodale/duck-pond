@@ -77,7 +77,11 @@ const pond = {
   // A duck on land is not.
   applyCrop(d, sc) {
     const S = window.Sprites;
-    const floating = d.mode === 'swim';
+    // A duck is on land only while walking in down the bank, or waddling off
+    // into the bushes. Quacking, diving and flying all happen over water, so
+    // those stay cropped — otherwise a resize mid-animation pops the feet out.
+    const onLand = d.mode === 'enter' || (d.mode === 'exit' && d.exit === 'waddle');
+    const floating = !onLand;
     const h = (floating ? S.CELL - S.WATERLINE_CUT : S.CELL) * sc;
     d.el.style.width = (S.CELL * sc) + 'px';
     d.el.style.height = h + 'px';
