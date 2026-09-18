@@ -185,10 +185,18 @@ const pond = {
 
   stepEnter(d, sc) {
     const p = Math.min(1, d.t / (this.reduced ? 300 : 1500));
-    d.x = d.sx + (d.tx - d.sx) * p;
-    d.y = d.sy + (d.ty - d.sy) * p;
+    if (this.reduced) {
+      // No slide across the pond: the duck appears where it is going and
+      // fades in, matching how exits behave under reduced motion.
+      d.x = d.tx; d.y = d.ty;
+      d.el.style.opacity = String(p);
+    } else {
+      d.x = d.sx + (d.tx - d.sx) * p;
+      d.y = d.sy + (d.ty - d.sy) * p;
+    }
     d.vx = -1;                                   // facing left as it walks in
     if (p >= 1) {
+      d.el.style.opacity = '1';
       d.mode = 'swim';
       d.anim = 'swim';
       d.vx = -(0.15 + this.rand() * 0.2);
@@ -214,7 +222,11 @@ const pond = {
       d.x += (-(window.Sprites.CELL * sc) - d.x) * 0.028;
       d.vx = -1;
       if (d.x < 120) d.el.style.opacity = String(Math.max(0, (d.x + 40) / 160));
-      return d.x < -(window.Sprites.CELL * sc);
+      // Terminate on elapsed time, never on an exact position crossing. The
+      // easing approaches its target asymptotically and floating point parks
+      // it a fraction above, so `d.x < target` never fires and the duck leaks.
+      // By 1800ms the opacity ramp has already taken it to zero.
+      return d.t >= 1800;
     }
     if (d.exit === 'dive') {
       const q = Math.min(1, d.t / 680);
