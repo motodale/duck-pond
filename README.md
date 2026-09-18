@@ -1,8 +1,8 @@
 # Duck Pond
 
 Duck Pond hides your task list inside ducks swimming on a pond. Each duck
-carries one task. Click a duck to reveal its task, mark it done, or send it
-back to swim a while longer.
+carries one task. Click a duck to reveal its task, then mark it done or put
+it back in the pile to surface again later.
 
 ## Running it
 
@@ -19,11 +19,26 @@ Then visit `http://localhost:8000`.
 
 | Control | What it does |
 |---|---|
-| Click a duck | Reveals the task it's hiding |
+| Click a duck | Reveals the task it's hiding. The duck begins leaving the pond as soon as it's caught — waddling off, diving, or flying away, picked at random — regardless of which button you press next |
 | ✓ Done | Marks the revealed task done and moves it to Done history |
-| ↩ Not now | Sends the duck back to swim; the task stays in the pond |
+| ↩ Not now | Returns the task to the pile to be reshuffled; it may surface again in a later duck |
+| Escape (with the card open) | Dismisses the card without choosing a button; follows the **On dismiss** setting in the drawer (done, or back to the pile) |
 | Add a task (bottom bar) | Adds a new task; a duck brings it into the pond |
 | Tasks & settings (top bar) | Opens the drawer: full task list, settings, Done history |
+
+## Keyboard use
+
+The whole app works without a mouse.
+
+| Key | What it does |
+|---|---|
+| Tab / Shift+Tab | Moves focus between ducks (each is a real button in the page's tab order) |
+| Enter or Space (duck focused) | Catches the focused duck, same as clicking it |
+| Escape | Dismisses the reveal card if it's open (see the Controls table), otherwise closes the drawer if it's open and returns focus to the "Tasks & settings" button |
+
+The drawer's task list is a complete alternative to catching ducks: every
+task's text is visible and editable there directly, with no need to catch a
+duck or chase one down.
 
 ## Persistence
 
