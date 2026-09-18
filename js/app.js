@@ -45,6 +45,19 @@ document.addEventListener('DOMContentLoaded', () => {
       render();
     }
 
+    // Deleting a task whose duck is swimming sends that duck under immediately,
+    // then refills the gap it leaves.
+    function deleteTask(id) {
+      const task = state.byId(id);
+      if (!task) return;
+      const wasInPond = task.state === 'pond';
+      if (state.heldId === id) { card.hidden = true; window.pond.release(); }
+      state.deleteTask(id);
+      if (wasInPond) window.pond.removeByTaskId(id, 'dive');
+      refill();
+      render();
+    }
+
     btnDone.addEventListener('click', () => hideCard(true));
     btnNotNow.addEventListener('click', () => hideCard(false));
 
