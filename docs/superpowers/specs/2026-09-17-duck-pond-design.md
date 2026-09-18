@@ -114,16 +114,31 @@ Three sprite sheets by [CazBee](https://caz-bee.itch.io/), all
 | `ducky_3_spritesheet.png` | https://caz-bee.itch.io/ducky-3 | CC0 |
 | `ducky-idle.png`, `ducky-walk.png` | https://caz-bee.itch.io/ducky | CC0 |
 
-`gentleman_ducky_sheet.png` from https://caz-bee.itch.io/gentleman-ducky is
-**excluded from the first release**. That page carries no licence tag — only the
-informal line "Go ahead and use this asset in any of your projects!", which
-covers use but not redistribution, and this repository redistributes every file
-in it. CazBee has tagged their other three packs CC0, so this is likely an
-oversight. Ask them to tag it; add the duck once they confirm. The file and its
-`.aseprite` source stay out of the repository until then.
-
 `ducky_2` and `ducky_3` are pixel-identical frames with different palettes, so
 they cost nothing extra to support.
+
+#### The gentleman duck
+
+`gentleman_ducky_sheet.png` from https://caz-bee.itch.io/gentleman-ducky is
+**included, as a rare easter egg**.
+
+Its licence status differs from the others and is recorded here deliberately.
+That page carries no licence tag — only the informal line "Go ahead and use this
+asset in any of your projects!" It permits use but is silent on redistribution,
+which is what a public repository does. CazBee tagged their other three packs
+CC0, so this is most likely an oversight, and one message would settle it. The
+repository owner has accepted this risk knowingly and owns resolving it. The
+README records the same facts so anyone reading the repository sees them.
+
+**Behaviour.** He is a normal duck in every respect — same animations, same
+catching, same exits, holds a task like any other. He simply appears rarely:
+each newly spawned duck has a **2% chance** of being the gentleman instead of one
+of the three common skins. Nothing else marks him out and nothing announces him.
+Finding one is the whole joke.
+
+**One difference to handle:** his row 2 (quack) holds **2 frames** where the
+other sheets hold 4. Frame counts are therefore per-sheet metadata, not a shared
+constant. See *Sheet geometry*.
 
 ### Sheet geometry
 
@@ -133,10 +148,14 @@ Measured from the alpha channel of the supplied files:
 - **Grid:** 6 columns × 4 rows (sheet is 192 × 128)
 - **Row 0** — 2 frames — idle. Cropped at the waterline, this is the **swim** cycle.
 - **Row 1** — 6 frames — **waddle**. Used walking in from the right.
-- **Row 2** — 4 frames — **quack**. Played once when the duck is caught. (The
-  gentleman sheet has 2 frames in this row; irrelevant while it is excluded.)
+- **Row 2** — **quack**. Played once when the duck is caught. 4 frames on the
+  common sheets, **2 on the gentleman sheet**.
 - **Row 3** — 6 frames — a faster, busier walk. Used as the **hurried waddle**
   for a duck leaving into the bushes. It is too active to read as swimming.
+
+Row frame counts vary by sheet, so each sheet declares its own in `js/sprites.js`
+rather than sharing one table. A sheet whose row is shorter must never step past
+its last frame into the empty cells beside it.
 
 `ducky-walk.png` (4 frames) and `ducky-idle.png` (2 frames) are 48 × 48 cells in
 a single row — larger versions of the duckling. They are **not used** in the
@@ -291,6 +310,9 @@ Not negotiable, and not trimmed for effort.
 | `LICENSE` | GPL-3.0 |
 | `.gitignore` | Ignores `.superpowers/` — design-session mockups never ship |
 
+Duck skins are data, not code: adding a fourth common skin should mean adding one
+entry to the sheet table in `js/sprites.js` and nothing else.
+
 `js/state.js` holds no DOM references of any kind. This is what makes it testable
 and it is a hard rule, not a preference.
 
@@ -334,8 +356,9 @@ confidence.
 
 ## Open items
 
-- **The gentleman duck.** Blocked on CazBee tagging a licence. Not a blocker for
-  release; it is one more skin.
+- **The gentleman duck's licence.** He ships as an easter egg now. Getting CazBee
+  to tag the page is outstanding and owned by the repository owner. Nothing in the
+  build depends on it.
 - **A pixel pond tileset.** Being hunted in parallel. `js/scene.js` is built to be
   replaced. Until then the scene is procedural.
 
