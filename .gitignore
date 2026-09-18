@@ -1,0 +1,9 @@
+# Brainstorming companion mockups — design-session scratch, never ships
+.superpowers/
+
+# Gentleman duck: caz-bee.itch.io/gentleman-ducky carries no licence tag, only an
+# informal "use this in any of your projects". That permits use but says nothing
+# about redistribution, and this repo redistributes every file in it. Held out
+# until CazBee tags a licence. See docs/superpowers/specs/2026-09-17-duck-pond-design.md
+gentleman_ducky_sheet.png
+gentleman_ducky.aseprite
