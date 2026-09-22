@@ -4,6 +4,9 @@ Duck Pond hides your task list inside ducks swimming on a pond. Each duck
 carries one task. Click a duck to reveal its task, then mark it done or put
 it back in the pile to surface again later.
 
+## Live
+Live: https://motodale.github.io/duck-pond/
+
 ## Running it
 
 No build step. Open `index.html` directly in a browser, or serve the folder
