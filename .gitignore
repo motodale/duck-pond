@@ -1,2 +1,6 @@
 # Brainstorming companion mockups — design-session scratch, never ships
 .superpowers/
+
+# Freesound originals — the converted .ogg files in assets/audio/ are what ships
+/*__*.wav
+/*__*.mp3

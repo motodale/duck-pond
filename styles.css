@@ -1,0 +1,184 @@
+:root {
+  --bg: #1d2418;
+  --panel: #262f20;
+  --ink: #e8e4d8;
+  --ink-dim: #a8a394;
+  --accent: #ffd479;
+  --card-bg: rgba(28, 24, 18, .95);
+  --line: rgba(255, 255, 255, .16);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 8px 14px; background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+.topbar h1 { font-size: 17px; margin: 0; }
+
+/* The pond takes every pixel it can. */
+#stage { position: relative; flex: 1; min-height: 320px; overflow: hidden; }
+#sceneCanvas {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  image-rendering: pixelated;
+}
+/* z-index: 0 is load-bearing. pond.js sets each duck's z-index to its y for
+   depth sorting, and without a stacking context here those values (200+) are
+   compared against the whole page — ducks paint over the drawer and the reveal
+   card. This confines the sort to the pond layer. */
+#ducks { position: absolute; inset: 0; z-index: 0; }
+
+#emptyHint {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0; padding: 10px 16px;
+  background: var(--card-bg); border: 1px solid var(--line); border-radius: 10px;
+  color: var(--ink-dim); text-align: center; max-width: 80%;
+}
+
+/* A duck: the wrapper is the button and the crop; the inner div is the sprite.
+   Cropping the wrapper is what hides the duck's feet at the waterline. */
+.duck {
+  position: absolute; left: 0; top: 0;
+  padding: 0; border: 0; background: none;
+  overflow: hidden;              /* the waterline */
+  cursor: pointer;
+  border-radius: 8px;
+  will-change: transform;
+}
+.duck-spr {
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+.duck:hover { background: rgba(255, 255, 255, .12); }
+.duck:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.duck[disabled] { cursor: default; }
+
+.card {
+  position: absolute; left: 50%; bottom: 16px;
+  transform: translateX(-50%);
+  background: var(--card-bg); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 18px; min-width: 300px; max-width: 90%;
+  text-align: center; box-shadow: 0 12px 34px rgba(0, 0, 0, .5);
+}
+.card[hidden] { display: none; }
+.card-label {
+  margin: 0; font-size: 10px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ink-dim);
+}
+#revealText { margin: 6px 0 12px; font-size: 19px; }
+.card-actions { display: flex; gap: 8px; justify-content: center; }
+
+button, select, input[type="text"], input[type="number"] {
+  font: inherit; color: inherit;
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid var(--line); border-radius: 8px;
+  padding: 7px 14px; cursor: pointer;
+}
+button:hover { background: rgba(255, 255, 255, .17); }
+input[type="text"] { cursor: text; }
+.num { width: 4.4em; flex: none; padding: 7px 4px 7px 8px; text-align: right; cursor: text; }
+
+/* A third of the width, hard left. The floor keeps it usable on a phone,
+   where a third of the screen would not fit the field and its two buttons. */
+#addForm {
+  display: flex; gap: 8px; padding: 10px 14px; background: var(--panel);
+  align-self: flex-start;
+  width: min(100%, max(320px, 34%));
+}
+#addInput { flex: 1; }
+
+/* The drawer covers the topbar, so it carries its own close button — the
+   toggle that opened it is underneath the panel and unclickable. */
+#drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(640px, 92vw);
+  background: var(--panel); border-left: 1px solid var(--line);
+  padding: 16px; z-index: 50;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+#drawer[hidden] { display: none; }
+#drawerClose { position: absolute; top: 12px; right: 14px; padding: 4px 10px; line-height: 1; }
+#drawer h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-dim); margin: 12px 0 6px; }
+#drawer > section:first-of-type h2 { padding-right: 44px; }   /* clear of the close button */
+/* Only the lists scroll. The panel itself never grows past the screen. */
+#drawer > section:has(ul) { flex: 1 1 0; display: flex; flex-direction: column; min-height: 0; }
+.drawer-note { font-size: 13px; color: var(--ink-dim); margin: 0 0 8px; }
+#taskList, #historyList {
+  list-style: none; margin: 0; padding: 0 10px;
+  flex: 1 1 0; min-height: 90px; overflow-y: auto;
+  border: 1px solid var(--line); border-radius: 8px;
+}
+#taskList li, #historyList li {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 0; border-bottom: 1px solid var(--line);
+}
+#taskList li .badge {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--ink-dim); border: 1px solid var(--line);
+  border-radius: 5px; padding: 1px 6px; flex: none;
+}
+#taskList li input[type="text"] { flex: 1; min-width: 0; }
+#drawer label { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+#clearHistory { flex: none; align-self: flex-start; margin-top: 10px; }
+#clearHistory[disabled] { opacity: .45; cursor: default; }
+#clearHistory[disabled]:hover { background: rgba(255, 255, 255, .08); }
+
+/* Bottom right, opposite the add-task bar. Below the drawer's z-index so an
+   open drawer covers it, like everything else on the page. */
+#creditsBtn {
+  position: fixed; right: 14px; bottom: 12px; z-index: 40;
+  padding: 5px 12px; font-size: 13px; color: var(--ink-dim);
+  background: var(--card-bg);
+}
+#creditsBtn:hover { color: var(--ink); background: rgba(255, 255, 255, .17); }
+
+/* A modal <dialog> renders in the browser's top layer, so it needs no z-index
+   of its own to clear the drawer. */
+#creditsDialog {
+  max-width: min(560px, 92vw); max-height: 82vh; overflow-y: auto;
+  padding: 20px 24px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--panel); color: var(--ink);
+}
+#creditsDialog::backdrop { background: rgba(0, 0, 0, .6); }
+#creditsDialog h2 { margin: 0 0 10px; font-size: 18px; }
+#creditsDialog h3 {
+  margin: 20px 0 6px; font-size: 12px; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--ink-dim);
+}
+#creditsDialog a { color: var(--accent); }
+#creditsDialog code { font-size: 13px; color: var(--ink); }
+.credits-note { font-size: 13px; color: var(--ink-dim); margin: 6px 0; }
+.credits { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+.credits li {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px;
+  padding: 6px 0; border-bottom: 1px solid var(--line);
+}
+.credits .lic {
+  margin-left: auto; flex: none;
+  font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--ink-dim); border: 1px solid var(--line);
+  border-radius: 5px; padding: 1px 6px;
+}
+#creditsClose { margin-top: 20px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
