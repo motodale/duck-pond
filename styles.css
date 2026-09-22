@@ -40,7 +40,11 @@ body {
   width: 100%; height: 100%;
   image-rendering: pixelated;
 }
-#ducks { position: absolute; inset: 0; }
+/* z-index: 0 is load-bearing. pond.js sets each duck's z-index to its y for
+   depth sorting, and without a stacking context here those values (200+) are
+   compared against the whole page — ducks paint over the drawer and the reveal
+   card. This confines the sort to the pond layer. */
+#ducks { position: absolute; inset: 0; z-index: 0; }
 
 #emptyHint {
   position: absolute; left: 50%; top: 50%;
@@ -83,7 +87,7 @@ body {
 #revealText { margin: 6px 0 12px; font-size: 19px; }
 .card-actions { display: flex; gap: 8px; justify-content: center; }
 
-button, select, input[type="text"] {
+button, select, input[type="text"], input[type="number"] {
   font: inherit; color: inherit;
   background: rgba(255, 255, 255, .08);
   border: 1px solid var(--line); border-radius: 8px;
@@ -91,19 +95,37 @@ button, select, input[type="text"] {
 }
 button:hover { background: rgba(255, 255, 255, .17); }
 input[type="text"] { cursor: text; }
+.num { width: 4.4em; flex: none; padding: 7px 4px 7px 8px; text-align: right; cursor: text; }
 
-#addForm { display: flex; gap: 8px; padding: 10px 14px; background: var(--panel); }
+/* A third of the width, hard left. The floor keeps it usable on a phone,
+   where a third of the screen would not fit the field and its two buttons. */
+#addForm {
+  display: flex; gap: 8px; padding: 10px 14px; background: var(--panel);
+  align-self: flex-start;
+  width: min(100%, max(320px, 34%));
+}
 #addInput { flex: 1; }
 
+/* The drawer covers the topbar, so it carries its own close button — the
+   toggle that opened it is underneath the panel and unclickable. */
 #drawer {
-  position: fixed; top: 0; right: 0; bottom: 0; width: min(420px, 92vw);
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(640px, 92vw);
   background: var(--panel); border-left: 1px solid var(--line);
-  padding: 16px; overflow-y: auto; z-index: 50;
+  padding: 16px; z-index: 50;
+  display: flex; flex-direction: column; overflow: hidden;
 }
 #drawer[hidden] { display: none; }
-#drawer h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-dim); }
-.drawer-note { font-size: 13px; color: var(--ink-dim); }
-#taskList, #historyList { list-style: none; margin: 0; padding: 0; }
+#drawerClose { position: absolute; top: 12px; right: 14px; padding: 4px 10px; line-height: 1; }
+#drawer h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-dim); margin: 12px 0 6px; }
+#drawer > section:first-of-type h2 { padding-right: 44px; }   /* clear of the close button */
+/* Only the lists scroll. The panel itself never grows past the screen. */
+#drawer > section:has(ul) { flex: 1 1 0; display: flex; flex-direction: column; min-height: 0; }
+.drawer-note { font-size: 13px; color: var(--ink-dim); margin: 0 0 8px; }
+#taskList, #historyList {
+  list-style: none; margin: 0; padding: 0 10px;
+  flex: 1 1 0; min-height: 90px; overflow-y: auto;
+  border: 1px solid var(--line); border-radius: 8px;
+}
 #taskList li, #historyList li {
   display: flex; align-items: center; gap: 8px;
   padding: 7px 0; border-bottom: 1px solid var(--line);
@@ -115,6 +137,47 @@ input[type="text"] { cursor: text; }
 }
 #taskList li input[type="text"] { flex: 1; min-width: 0; }
 #drawer label { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+#clearHistory { flex: none; align-self: flex-start; margin-top: 10px; }
+#clearHistory[disabled] { opacity: .45; cursor: default; }
+#clearHistory[disabled]:hover { background: rgba(255, 255, 255, .08); }
+
+/* Bottom right, opposite the add-task bar. Below the drawer's z-index so an
+   open drawer covers it, like everything else on the page. */
+#creditsBtn {
+  position: fixed; right: 14px; bottom: 12px; z-index: 40;
+  padding: 5px 12px; font-size: 13px; color: var(--ink-dim);
+  background: var(--card-bg);
+}
+#creditsBtn:hover { color: var(--ink); background: rgba(255, 255, 255, .17); }
+
+/* A modal <dialog> renders in the browser's top layer, so it needs no z-index
+   of its own to clear the drawer. */
+#creditsDialog {
+  max-width: min(560px, 92vw); max-height: 82vh; overflow-y: auto;
+  padding: 20px 24px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--panel); color: var(--ink);
+}
+#creditsDialog::backdrop { background: rgba(0, 0, 0, .6); }
+#creditsDialog h2 { margin: 0 0 10px; font-size: 18px; }
+#creditsDialog h3 {
+  margin: 20px 0 6px; font-size: 12px; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--ink-dim);
+}
+#creditsDialog a { color: var(--accent); }
+#creditsDialog code { font-size: 13px; color: var(--ink); }
+.credits-note { font-size: 13px; color: var(--ink-dim); margin: 6px 0; }
+.credits { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+.credits li {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px;
+  padding: 6px 0; border-bottom: 1px solid var(--line);
+}
+.credits .lic {
+  margin-left: auto; flex: none;
+  font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--ink-dim); border: 1px solid var(--line);
+  border-radius: 5px; padding: 1px 6px;
+}
+#creditsClose { margin-top: 20px; }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .01ms !important; transition-duration: .01ms !important; }

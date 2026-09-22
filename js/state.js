@@ -6,8 +6,13 @@ const MAX_TASK_LEN = 100;
 const CAPACITY_MIN = 4;
 const CAPACITY_MAX = 20;
 
-const DEFAULTS = { capacity: 12, onDismiss: 'done', volume: 0.7 };
-const SAVED_FIELDS = ['tasks', 'capacity', 'onDismiss', 'volume'];
+const WEIGHT_MIN = 1, WEIGHT_MAX = 10;
+const MULT_MIN = 0.5, MULT_MAX = 5;
+
+// Ambience defaults lower than the quacks: it is a bed that runs constantly,
+// and plenty of people would rather it stayed quiet or off.
+const DEFAULTS = { capacity: 12, onDismiss: 'done', volume: 0.7, ambience: 0.35 };
+const SAVED_FIELDS = ['tasks', 'capacity', 'onDismiss', 'volume', 'ambience'];
 
 // crypto.randomUUID needs a secure context. file:// qualifies in current
 // browsers, but the fallback costs one line and removes a whole failure mode.
@@ -25,19 +30,18 @@ function clampCapacity(n) {
   return Math.max(CAPACITY_MIN, Math.min(CAPACITY_MAX, isNaN(v) ? DEFAULTS.capacity : v));
 }
 
-function clampVolume(v) {
+function clampNum(v, min, max, dflt) {
   const n = parseFloat(v);
-  return Math.max(0, Math.min(1, isNaN(n) ? DEFAULTS.volume : n));
+  return Math.max(min, Math.min(max, isNaN(n) ? dflt : n));
 }
 
-// Fisher-Yates. `rand` is injected so tests can make shuffles reproducible.
-function shuffleInPlace(arr, rand) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
-  }
-  return arr;
-}
+function clampVolume(v) { return clampNum(v, 0, 1, DEFAULTS.volume); }
+function clampAmbience(v) { return clampNum(v, 0, 1, DEFAULTS.ambience); }
+function clampWeight(v) { return clampNum(v, WEIGHT_MIN, WEIGHT_MAX, 1); }
+function clampMult(v) { return clampNum(v, MULT_MIN, MULT_MAX, 1); }
+
+// A pile task's odds of being drawn next.
+function odds(t) { return t.weight * t.multiplier; }
 
 class DuckPondState {
   constructor(opts) {
@@ -49,6 +53,7 @@ class DuckPondState {
     this.capacity = DEFAULTS.capacity;
     this.onDismiss = DEFAULTS.onDismiss;   // 'done' | 'pile'
     this.volume = DEFAULTS.volume;
+    this.ambience = DEFAULTS.ambience;
 
     // The task whose card is currently open. Its state stays 'pond' so the
     // pond does not refill underneath an open card.
@@ -72,14 +77,30 @@ class DuckPondState {
 
   // ---- mutations ----
 
-  addTask(text) {
+  addTask(text, weight, multiplier) {
     const clean_ = clean(text);
     if (!clean_) return null;
-    const task = { id: uid(), text: clean_, state: 'pile', doneAt: null };
+    const task = {
+      id: uid(), text: clean_, state: 'pile', doneAt: null,
+      weight: clampWeight(weight), multiplier: clampMult(multiplier)
+    };
     this.tasks.push(task);
-    this.shufflePile();
     this.notify();
     return task;
+  }
+
+  setWeight(id, w) {
+    const t = this.byId(id);
+    if (!t) return;
+    t.weight = clampWeight(w);
+    this.notify();
+  }
+
+  setMultiplier(id, m) {
+    const t = this.byId(id);
+    if (!t) return;
+    t.multiplier = clampMult(m);
+    this.notify();
   }
 
   editTask(id, text) {
@@ -90,16 +111,28 @@ class DuckPondState {
     this.notify();
   }
 
+  // Drops the Done history. Only 'done' tasks go — anything in the pond or the
+  // pile is still in play and stays.
+  clearHistory() {
+    this.tasks = this.tasks.filter(t => t.state !== 'done');
+    this.notify();
+  }
+
   deleteTask(id) {
     this.tasks = this.tasks.filter(t => t.id !== id);
     if (this.heldId === id) this.heldId = null;
     this.notify();
   }
 
-  // Moves the first pile task into the pond. The caller spawns the duck.
+  // Moves one pile task into the pond. The caller spawns the duck.
+  // Weighted draw: a task's odds are weight x multiplier. This is the only
+  // randomness in the pile, so array order carries no meaning any more.
   takeFromPile() {
-    const t = this.tasks.find(x => x.state === 'pile');
-    if (!t) return null;
+    const pile = this.tasksIn('pile');
+    if (!pile.length) return null;
+    let r = this.rand() * pile.reduce((sum, t) => sum + odds(t), 0);
+    // The fallback covers float drift landing r past the last boundary.
+    const t = pile.find(x => (r -= odds(x)) < 0) || pile[pile.length - 1];
     t.state = 'pond';
     this.notify();
     return t;
@@ -114,22 +147,9 @@ class DuckPondState {
     } else {
       t.state = 'pile';
       t.doneAt = null;
-      this.shufflePile();
     }
     if (this.heldId === id) this.heldId = null;
     this.notify();
-  }
-
-  // Shuffles only the pile entries, leaving pond and done tasks at their
-  // existing indices. Pile order IS array order.
-  shufflePile() {
-    const idx = [];
-    for (let i = 0; i < this.tasks.length; i++) {
-      if (this.tasks[i].state === 'pile') idx.push(i);
-    }
-    const picked = idx.map(i => this.tasks[i]);
-    shuffleInPlace(picked, this.rand);
-    idx.forEach((i, k) => { this.tasks[i] = picked[k]; });
   }
 
   // ---- settings ----
@@ -146,6 +166,11 @@ class DuckPondState {
 
   setVolume(v) {
     this.volume = clampVolume(v);
+    this.notify();
+  }
+
+  setAmbience(v) {
+    this.ambience = clampAmbience(v);
     this.notify();
   }
 
@@ -176,6 +201,7 @@ class DuckPondState {
     if (typeof saved.capacity === 'number') this.setCapacityQuiet(saved.capacity);
     if (saved.onDismiss) this.onDismiss = saved.onDismiss === 'pile' ? 'pile' : 'done';
     if (typeof saved.volume === 'number') this.volume = clampVolume(saved.volume);
+    if (typeof saved.ambience === 'number') this.ambience = clampAmbience(saved.ambience);
 
     // Stored tasks can be stale or hand-edited, so backfill anything missing
     // and drop anything that is not shaped like a task.
@@ -186,7 +212,9 @@ class DuckPondState {
           id: t.id || uid(),
           text: clean(t.text) || 'Task',
           state: ['pile', 'pond', 'done'].indexOf(t.state) >= 0 ? t.state : 'pile',
-          doneAt: typeof t.doneAt === 'number' ? t.doneAt : null
+          doneAt: typeof t.doneAt === 'number' ? t.doneAt : null,
+          weight: clampWeight(t.weight),
+          multiplier: clampMult(t.multiplier)
         }));
     }
   }
@@ -198,7 +226,10 @@ class DuckPondState {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { DuckPondState, shuffleInPlace, MAX_TASK_LEN, CAPACITY_MIN, CAPACITY_MAX };
+  module.exports = {
+    DuckPondState, MAX_TASK_LEN, CAPACITY_MIN, CAPACITY_MAX,
+    WEIGHT_MIN, WEIGHT_MAX, MULT_MIN, MULT_MAX
+  };
 }
 if (typeof window !== 'undefined') {
   window.DuckPondState = DuckPondState;

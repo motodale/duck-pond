@@ -12,6 +12,21 @@ const WANDER_Y = 0.010;
 const MIN_DRIFT = 0.05;        // stops a duck parking dead still
 const SEPARATION = 62;         // css px
 
+// Waddling off is two phases. The duck paddles to the bank, then walks.
+// WADDLE_STEP is sheet pixels covered per animation frame, so the walk speed is
+// derived from the sheet's own cadence (FPS x scale) rather than set by eye —
+// that is what stops the feet skating. Raise it if the walk looks like a moonwalk,
+// lower it if the duck outruns its own legs.
+const WADDLE_STEP = 4;
+const WAKE_BACK = 4;           // sheet px behind a swimming duck for its wake
+// Paddling to the bank runs at a speed, not over a fixed duration: a duck
+// caught on the far side has four times as far to go as one already by the
+// left bank, and a shared duration made the far one shoot across the pond.
+// The cap keeps that worst case from becoming a long wait.
+const SHORE_SPEED = 170;       // css px per second
+const SHORE_MAX_MS = 2600;
+const WADDLE_MAX_MS = 8000;    // leak guard only; the walk ends at the page edge
+
 const pond = {
   container: null, state: null, onCatch: null,
   ducks: [], rand: Math.random, reduced: false,
@@ -50,13 +65,15 @@ const pond = {
       d.x = this.container.clientWidth + S.CELL * sc;
       d.y = w.cy + (this.rand() - 0.5) * w.ry * 0.8;
       d.sx = d.x; d.sy = d.y;
-      d.tx = w.cx + w.rx * (0.15 + this.rand() * 0.5);
-      d.ty = d.y + (this.rand() - 0.5) * 30;
+      const t = this.settle(w.cx + w.rx * (0.15 + this.rand() * 0.5),
+                            d.y + (this.rand() - 0.5) * 30);
+      d.tx = t.x; d.ty = t.y;
       d.anim = 'waddle';
     } else {
       const ang = this.rand() * Math.PI * 2, rad = Math.sqrt(this.rand()) * 0.85;
-      d.x = w.cx + Math.cos(ang) * w.rx * rad;
-      d.y = w.cy + Math.sin(ang) * w.ry * rad;
+      const p = this.settle(w.cx + Math.cos(ang) * w.rx * rad,
+                            w.cy + Math.sin(ang) * w.ry * rad);
+      d.x = p.x; d.y = p.y;
     }
 
     const el = document.createElement('button');
@@ -79,14 +96,49 @@ const pond = {
     return d;
   },
 
+  // Would a duck centred here have its whole body over water? The pond is
+  // convex, so testing the four corners of the body box covers every pixel
+  // between them — 4 mask lookups instead of 400.
+  onWater(x, y) {
+    const S = window.Sprites, sc = S.scale(), b = S.BODY;
+    const l = x - b.left * sc, r = x + b.right * sc;
+    const u = y - b.up * sc, d = y + b.down * sc;
+    return window.scene.isWater(l, u) && window.scene.isWater(r, u) &&
+           window.scene.isWater(l, d) && window.scene.isWater(r, d);
+  },
+
+  // Pulls a point toward the middle of the pond until a duck placed there
+  // fits. The ellipse gives a good first guess; this makes it exact, and it is
+  // what stops a duck spawning or being nudged onto the bank, where stepSwim's
+  // bounce (which only reverses velocity) would leave it stuck for good.
+  settle(x, y) {
+    const w = window.scene.water();
+    for (let i = 0; i < 30 && !this.onWater(x, y); i++) {
+      x += (w.cx - x) * 0.12;
+      y += (w.cy - y) * 0.12;
+    }
+    return { x, y };
+  },
+
+  // Where a duck meets the water, in CSS px below its centre. render() puts the
+  // element's top at d.y - CELL/2*sc and the crop makes it CELL-WATERLINE_CUT
+  // tall, so the waterline is this far down. Every ripple is emitted here:
+  // hardcoding a CSS-pixel offset instead put the wake ~21px above the duck at
+  // desktop scale, and a different amount off again on a phone.
+  waterline(sc) {
+    const S = window.Sprites;
+    return (S.CELL / 2 - S.WATERLINE_CUT) * sc;
+  },
+
   // A floating duck is cropped at the waterline so its feet do not show.
   // A duck on land is not.
   applyCrop(d, sc) {
     const S = window.Sprites;
     // A duck is on land only while walking in down the bank, or waddling off
-    // into the bushes. Quacking, diving and flying all happen over water, so
-    // those stay cropped — otherwise a resize mid-animation pops the feet out.
-    const onLand = d.mode === 'enter' || (d.mode === 'exit' && d.exit === 'waddle');
+    // into the bushes. Quacking happens over water, and so does the start of an
+    // exit — a leaving duck paddles before it wades, and d.feetOut marks the
+    // moment it reaches the shallows and its legs come into view.
+    const onLand = d.mode === 'enter' || (d.mode === 'exit' && d.feetOut);
     const floating = !onLand;
     const h = (floating ? S.CELL - S.WATERLINE_CUT : S.CELL) * sc;
     d.el.style.width = (S.CELL * sc) + 'px';
@@ -105,24 +157,35 @@ const pond = {
 
     d.mode = 'quack';
     d.anim = 'quack'; d.frame = 0; d.frameAcc = 0; d.t = 0;
-    window.scene.ripple(d.x, d.y + 12, { r: 3, alpha: 0.7, grow: 0.5, fade: 0.016, width: 2 });
-    if (window.audio) { window.audio.quack(); window.audio.splash(); }
+    window.scene.ripple(d.x, d.y + this.waterline(window.Sprites.scale()),
+                        { r: 3, alpha: 0.7, grow: 0.5, fade: 0.016, width: 2 });
+    if (window.audio) window.audio.quack();
     if (this.onCatch) this.onCatch(task);
   },
 
   // Called by app.js once the task is resolved, and by a delete from the drawer.
-  removeByTaskId(id, how) {
+  removeByTaskId(id) {
     const d = this.byTaskId(id);
     if (!d) return;
-    this.beginExit(d, how);
+    this.beginExit(d);
   },
 
-  beginExit(d, how) {
+  // There is one way out: paddle to the left bank, then waddle off into the
+  // bushes. Still afloat here, so it keeps the swim pose and the waterline
+  // crop until it is standing on the mud — stepExit switches both over.
+  beginExit(d) {
     d.mode = 'exit';
-    d.exit = how || ['waddle', 'dive', 'fly'][Math.floor(this.rand() * 3)];
     d.t = 0;
     d.el.disabled = true;
-    if (d.exit === 'waddle') { d.anim = 'hurry'; this.applyCrop(d, window.Sprites.scale()); }
+    const p = window.scene.shorePoint(d.y);
+    d.sx = d.x; d.sy = d.y;
+    d.tx = p.x; d.ty = p.y;
+    d.onShore = false;
+    d.feetOut = false;
+    d.shoreMs = Math.min(SHORE_MAX_MS,
+      Math.max(400, Math.hypot(d.tx - d.x, d.ty - d.y) / SHORE_SPEED * 1000));
+    d.anim = 'swim';                            // paddling, not yet walking
+    d.frame = 0; d.frameAcc = 0;
   },
 
   release() { this.ducks.forEach(o => { if (o.mode === 'swim') o.el.disabled = false; }); },
@@ -138,14 +201,12 @@ const pond = {
 
   resize() {
     window.scene.resize();
-    // A smaller window can leave ducks outside the new water ellipse.
-    const w = window.scene.water();
+    // A smaller window can leave ducks off the new water.
     this.ducks.forEach(d => {
       if (d.mode === 'swim') {
-        if (window.scene.contains(d.x, d.y)) return;
-        const ang = Math.atan2(d.y - w.cy, d.x - w.cx);
-        d.x = w.cx + Math.cos(ang) * w.rx * 0.8;
-        d.y = w.cy + Math.sin(ang) * w.ry * 0.8;
+        if (this.onWater(d.x, d.y)) return;
+        const p = this.settle(d.x, d.y);
+        d.x = p.x; d.y = p.y;
       } else if (d.mode === 'enter') {
         // An entering duck's tx/ty were aimed at the pre-resize ellipse. Left
         // alone on a shrink, it walks to a point now outside the water, flips
@@ -153,10 +214,9 @@ const pond = {
         // never steers back in) — so it can freeze on the grass for the rest
         // of the session. Re-aim the target the same way a swimming duck gets
         // nudged back in.
-        if (window.scene.contains(d.tx, d.ty)) return;
-        const ang = Math.atan2(d.ty - w.cy, d.tx - w.cx);
-        d.tx = w.cx + Math.cos(ang) * w.rx * 0.8;
-        d.ty = w.cy + Math.sin(ang) * w.ry * 0.8;
+        if (this.onWater(d.tx, d.ty)) return;
+        const t = this.settle(d.tx, d.ty);
+        d.tx = t.x; d.ty = t.y;
       }
     });
     this.ducks.forEach(d => this.applyCrop(d, window.Sprites.scale()));
@@ -173,10 +233,10 @@ const pond = {
       const d = this.ducks[i];
       d.t += dt;
 
-      if (d.mode === 'swim') this.stepSwim(d, i, dt);
+      if (d.mode === 'swim') this.stepSwim(d, i, dt, sc);
       else if (d.mode === 'enter') this.stepEnter(d, sc);
       else if (d.mode === 'quack') this.stepQuack(d);
-      else if (d.mode === 'exit') { if (this.stepExit(d, sc)) { d.el.remove(); this.ducks.splice(i, 1); continue; } }
+      else if (d.mode === 'exit') { if (this.stepExit(d, sc, dt)) { d.el.remove(); this.ducks.splice(i, 1); continue; } }
 
       this.stepFrame(d, dt);
       this.render(d, sc, t);
@@ -185,7 +245,7 @@ const pond = {
     window.scene.draw();
   },
 
-  stepSwim(d, i, dt) {
+  stepSwim(d, i, dt, sc) {
     if (this.reduced) return;                 // ducks hold still, sprite still idles
 
     d.vx += (this.rand() - 0.5) * WANDER_X;
@@ -208,11 +268,12 @@ const pond = {
     if (Math.abs(d.vx) < MIN_DRIFT) d.vx = d.vx < 0 ? -MIN_DRIFT : MIN_DRIFT;
 
     const nx = d.x + d.vx, ny = d.y + d.vy;
-    if (window.scene.contains(nx, d.y)) d.x = nx; else d.vx = -d.vx;
-    if (window.scene.contains(d.x, ny)) d.y = ny; else d.vy = -d.vy;
+    if (this.onWater(nx, d.y)) d.x = nx; else d.vx = -d.vx;
+    if (this.onWater(d.x, ny)) d.y = ny; else d.vy = -d.vy;
 
     if (this.rand() < 0.07) {
-      window.scene.ripple(d.x - Math.sign(d.vx) * 12, d.y + 12,
+      window.scene.ripple(d.x - Math.sign(d.vx) * WAKE_BACK * sc,
+                          d.y + this.waterline(sc),
                           { r: 2, alpha: 0.26, grow: 0.2, fade: 0.0075 });
     }
   },
@@ -236,46 +297,57 @@ const pond = {
       d.vx = -(0.15 + this.rand() * 0.2);
       this.applyCrop(d, sc);
       if (!this.state.heldId) d.el.disabled = false;
-      window.scene.ripple(d.x, d.y + 12, { r: 3, alpha: 0.5, grow: 0.3, fade: 0.012, width: 1.5 });
+      window.scene.ripple(d.x, d.y + this.waterline(sc),
+                          { r: 3, alpha: 0.5, grow: 0.3, fade: 0.012, width: 1.5 });
     }
   },
 
   stepQuack(d) {
     const S = window.Sprites;
     const dur = (S.frameCount(d.skin, 'quack') / S.FPS) * 1000;
-    if (d.t >= dur) this.beginExit(d, null);
+    if (d.t >= dur) this.beginExit(d);
   },
 
   // Returns true when the duck is finished and should be removed.
-  stepExit(d, sc) {
+  stepExit(d, sc, dt) {
     if (this.reduced) {
       d.el.style.opacity = String(Math.max(0, 1 - d.t / 300));
       return d.t >= 300;
     }
-    if (d.exit === 'waddle') {
-      d.x += (-(window.Sprites.CELL * sc) - d.x) * 0.028;
-      d.vx = -1;
-      if (d.x < 120) d.el.style.opacity = String(Math.max(0, (d.x + 40) / 160));
-      // Terminate on elapsed time, never on an exact position crossing. The
-      // easing approaches its target asymptotically and floating point parks
-      // it a fraction above, so `d.x < target` never fires and the duck leaks.
-      // By 1800ms the opacity ramp has already taken it to zero.
-      return d.t >= 1800;
+    d.vx = -1;                                  // leaving left, in both phases
+    if (!d.onShore) {
+      // Phase 1: paddle to the bank. A straight lerp, the same shape stepEnter
+      // uses, so it lands exactly on the mud instead of creeping up on it
+      // asymptotically. d.shoreMs came from the distance, so the speed is the
+      // same wherever the duck was caught.
+      const p = Math.min(1, d.t / d.shoreMs);
+      d.x = d.sx + (d.tx - d.sx) * p;
+      d.y = d.sy + (d.ty - d.sy) * p;
+      // The legs start, and the feet come into view, the moment the body
+      // leaves open water — which the mask tells us exactly. It is wading the
+      // last stretch by then, so the feet belong on show. Waiting for the shore
+      // point instead left the walk cycle to begin in the last frames of a
+      // paddle that can run 2.6s.
+      if (!d.feetOut && (p >= 1 || !this.onWater(d.x, d.y))) {
+        d.feetOut = true;
+        d.anim = 'hurry';
+        d.frame = 0; d.frameAcc = 0;
+        this.applyCrop(d, sc);
+      }
+      if (p < 1) return false;
+      d.onShore = true;
+      d.t = 0;
+      return false;
     }
-    if (d.exit === 'dive') {
-      const q = Math.min(1, d.t / 680);
-      d.spin = q * 155; d.shrink = 1 - q * 0.8;
-      d.el.style.opacity = String(1 - q);
-      if (d.t % 100 < 20) window.scene.ripple(d.x, d.y + 10, { r: 3 + q * 12, alpha: 0.34, grow: 0.3, fade: 0.012 });
-      if (q >= 1) window.scene.ripple(d.x, d.y + 10, { r: 6, alpha: 0.62, grow: 0.45, fade: 0.013, width: 2 });
-      return q >= 1;
-    }
-    const q = Math.min(1, d.t / 1000);          // fly
-    d.x -= 1.9; d.y -= 2.6 + q * 2.4;
-    d.vx = -1;                                  // flying left, so face left
-    d.spin = -q * 20; d.shrink = 1 - q * 0.32;
-    d.el.style.opacity = String(1 - q * 0.9);
-    return q >= 1;
+    // Phase 2: walk. One animation frame carries the duck WADDLE_STEP sheet
+    // pixels, so the ground speed and the leg animation agree.
+    d.x -= WADDLE_STEP * window.Sprites.FPS * sc * (dt / 1000);
+    // No fade: it stays fully visible the whole way out, and #stage's overflow
+    // clips it at the page edge. Ending on the position is safe here because
+    // the speed is constant, so the edge always arrives. It was the old easing,
+    // which approached its target asymptotically and never reached it, that
+    // made a position test leak ducks. The time cap is a guard, not the path.
+    return d.x < -(window.Sprites.CELL * sc) || d.t >= WADDLE_MAX_MS;
   },
 
   stepFrame(d, dt) {
@@ -296,8 +368,6 @@ const pond = {
       ? Math.sin(t / 430 + d.phase) * 2.5 : 0;
     const half = (S.CELL * sc) / 2;
     let tf = 'translate(' + Math.round(d.x - half) + 'px,' + Math.round(d.y - half + bob) + 'px)';
-    if (d.spin) tf += ' rotate(' + d.spin.toFixed(1) + 'deg)';
-    if (d.shrink) tf += ' scale(' + d.shrink.toFixed(3) + ')';
     if (d.vx < 0) tf += ' scaleX(-1)';          // sheets face right
     d.el.style.transform = tf;
     d.el.style.zIndex = String(Math.round(d.y));   // depth sort

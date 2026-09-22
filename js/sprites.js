@@ -8,6 +8,12 @@ const SHEET_ROWS = 4;
 const FPS = 7;                 // the stepped, game-like feel comes from here
 const WATERLINE_CUT = 5;       // sheet px hidden at the bottom of a floating duck
 
+// The visible body of a floating duck, in sheet px from the cell centre. The
+// union of all three sheets above the waterline cut, measured off the art
+// rather than guessed — the gentleman's hat is what sets `up`. pond.js keeps
+// this box on water, so a duck never overhangs the mud.
+const BODY = { left: 10, right: 11, up: 11, down: 10 };
+
 const ROW = { swim: 0, waddle: 1, quack: 2, hurry: 3 };
 
 // Frame counts differ per sheet — the gentleman's quack is 2 frames where the
@@ -70,6 +76,6 @@ function preload() {
 }
 
 window.Sprites = {
-  CELL, SHEET_COLS, SHEET_ROWS, FPS, WATERLINE_CUT, ROW, SHEETS,
+  CELL, SHEET_COLS, SHEET_ROWS, FPS, WATERLINE_CUT, BODY, ROW, SHEETS,
   scale, pickSkin, frameCount, style, preload
 };

@@ -31,13 +31,17 @@
 <form id="addForm" autocomplete="off">
   <label class="visually-hidden" for="addInput">Add a task</label>
   <input id="addInput" type="text" maxlength="100" placeholder="Add a task…">
+  <label class="visually-hidden" for="addWeight">Weight</label>
+  <input id="addWeight" class="num" type="number" min="1" max="10" step="1" value="1" title="Weight: how likely a duck is to bring this one">
   <button type="submit">Add</button>
 </form>
 
 <aside id="drawer" hidden>
+  <button id="drawerClose" type="button" aria-label="Close tasks and settings">✕</button>
+
   <section>
     <h2>Tasks</h2>
-    <p class="drawer-note">This list shows every task, including the ones ducks are hiding.</p>
+    <p class="drawer-note">Every task, including the ones ducks are hiding. The two numbers are weight and multiplier: their product is how likely a task is to be drawn next.</p>
     <ul id="taskList"></ul>
   </section>
 
@@ -53,17 +57,74 @@
         <option value="pile">Put back in the pile</option>
       </select>
     </label>
-    <label>Volume
+    <label>Quack volume
       <input id="volumeInput" type="range" min="0" max="100" step="1">
       <output id="volumeVal"></output>
+    </label>
+    <label>Pond ambience
+      <input id="ambienceInput" type="range" min="0" max="100" step="1">
+      <output id="ambienceVal"></output>
     </label>
   </section>
 
   <section>
     <h2>Done</h2>
     <ul id="historyList"></ul>
+    <button id="clearHistory" type="button">Clear history</button>
   </section>
 </aside>
+
+<button id="creditsBtn" type="button" aria-haspopup="dialog">Credits</button>
+
+<!-- A native <dialog>: modal behaviour, focus trap, Escape to close and the
+     backdrop all come free. The CC BY 4.0 ambience requires its attribution to
+     travel with the app, so it lives here and not only in the README. -->
+<dialog id="creditsDialog" aria-labelledby="creditsHeading">
+  <h2 id="creditsHeading">Credits</h2>
+
+  <p class="credits-note">Duck Pond is built with good intentions and love, Below are some credits to the sounds and images used.</p>
+
+  <h3>Duck sprites</h3>
+  <p class="credits-note">All three sheets are by CazBee.</p>
+  <ul class="credits">
+    <li><code>ducky_2_spritesheet.png</code>
+      <a href="https://caz-bee.itch.io/ducky-2">caz-bee.itch.io/ducky-2</a>
+      <span class="lic">CC0</span></li>
+    <li><code>ducky_3_spritesheet.png</code>
+      <a href="https://caz-bee.itch.io/ducky-3">caz-bee.itch.io/ducky-3</a>
+      <span class="lic">CC0</span></li>
+    <li><code>gentleman_ducky_sheet.png</code>
+      <a href="https://caz-bee.itch.io/gentleman-ducky">caz-bee.itch.io/gentleman-ducky</a>
+      <span class="lic">no licence tag</span></li>
+  </ul>
+  <p class="credits-note">The gentleman duck&rsquo;s page carries no licence tag.
+  It says only &ldquo;Go ahead and use this asset in any of your projects&rdquo;, I'm assuming it matches the previous ducks
+
+  <h3>Sound</h3>
+  <ul class="credits">
+    <li><code>quack-1.ogg</code> Mikes-MultiMedia
+      <a href="https://freesound.org/people/Mikes-MultiMedia/sounds/418509/">freesound.org/s/418509</a>
+      <span class="lic">CC0</span></li>
+    <li><code>quack-2.ogg</code> Mari0411
+      <a href="https://freesound.org/people/Mari0411/sounds/791152/">freesound.org/s/791152</a>
+      <span class="lic">CC0</span></li>
+    <li><code>quack-3.ogg</code> OwennewO
+      <a href="https://freesound.org/people/OwennewO/sounds/719115/">freesound.org/s/719115</a>
+      <span class="lic">CC0</span></li>
+    <li><code>pond-ambience.ogg</code> Ambient-X
+      <a href="https://freesound.org/s/859363/">freesound.org/s/859363</a>
+      <span class="lic">CC BY 4.0</span></li>
+  </ul>
+  <p class="credits-note">&ldquo;Goldade Acres Pond Sunset 6-16-26 20 minutes&rdquo;
+  by Ambient-X &mdash; <a href="https://freesound.org/s/859363/">https://freesound.org/s/859363/</a>
+  &mdash; License: Attribution 4.0. Modified: only the first 6 minutes are used,
+  with the head crossfaded onto the tail so the loop has no audible seam.</p>
+
+  <h3>Duck Pond itself</h3>
+  <p class="credits-note">GPL-3.0. See the <code>LICENSE</code> file.</p>
+
+  <button id="creditsClose" type="button">Close</button>
+</dialog>
 
 <script src="js/state.js"></script>
 <script src="js/sprites.js"></script>

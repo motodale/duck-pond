@@ -1,66 +1,45 @@
-// Duck Pond — audio. Three CC0 quack samples plus a synthesized splash.
-// Browsers refuse to start an AudioContext before a user gesture, so everything
-// waits for unlock().
+// Duck Pond — audio. Three CC0 quack samples and a looping pond ambience,
+// played as <audio> elements. Not decoded AudioContext buffers: fetch() is
+// blocked on file:// and the README tells people to open index.html directly,
+// so buffers left the app silent unless it was served. Browsers refuse to play
+// before a user gesture, so everything waits for unlock().
 
 const QUACKS = ['assets/audio/quack-1.ogg', 'assets/audio/quack-2.ogg', 'assets/audio/quack-3.ogg'];
+const AMBIENCE = 'assets/audio/pond-ambience.ogg';
+
+const clamp01 = v => Math.max(0, Math.min(1, v));
 
 const audio = {
-  ctx: null, gain: null, buffers: [], volume: 0.7, ready: false,
+  quacks: [], ambience: null, volume: 0.7, ambienceVolume: 0.35,
 
-  setVolume(v) {
-    this.volume = Math.max(0, Math.min(1, v));
-    if (this.gain) this.gain.gain.value = this.volume;
+  setVolume(v) { this.volume = clamp01(v); },
+
+  // Its own control, not a ratio of the quack volume: the ambience runs
+  // constantly and some people want it off while the quacks stay on.
+  setAmbience(v) {
+    this.ambienceVolume = clamp01(v);
+    if (this.ambience) this.ambience.volume = this.ambienceVolume;
   },
 
   unlock() {
-    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return;
-    this.ctx = new AC();
-    this.gain = this.ctx.createGain();
-    this.gain.gain.value = this.volume;
-    this.gain.connect(this.ctx.destination);
+    if (this.quacks.length) return;
+    this.quacks = QUACKS.map(src => new Audio(src));
 
-    QUACKS.forEach((src, i) => {
-      fetch(src)
-        .then(r => r.arrayBuffer())
-        .then(b => this.ctx.decodeAudioData(b))
-        .then(buf => { this.buffers[i] = buf; this.ready = true; })
-        .catch(e => console.error('Duck Pond: could not load ' + src, e));
-    });
+    // The file is cut to a whole 360s with its head crossfaded onto its tail,
+    // so looping it has no seam to hear.
+    this.ambience = new Audio(AMBIENCE);
+    this.ambience.loop = true;
+    this.ambience.volume = this.ambienceVolume;
+    this.ambience.play().catch(e => console.error('Duck Pond: could not play ambience', e));
   },
 
   quack() {
-    if (!this.ctx || !this.ready) return;
-    const pool = this.buffers.filter(Boolean);
-    if (!pool.length) return;
-    const src = this.ctx.createBufferSource();
-    src.buffer = pool[Math.floor(Math.random() * pool.length)];
-    src.playbackRate.value = 0.93 + Math.random() * 0.14;   // stops repeats sounding identical
-    src.connect(this.gain);
-    src.start();
-  },
-
-  // Filtered noise with a fast decay — keeps the splash in tune with its ripple
-  // and costs no file.
-  splash() {
-    if (!this.ctx) return;
-    const dur = 0.28;
-    const buf = this.ctx.createBuffer(1, Math.floor(this.ctx.sampleRate * dur), this.ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < data.length; i++) {
-      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 3);
-    }
-    const src = this.ctx.createBufferSource();
-    src.buffer = buf;
-    const lp = this.ctx.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.setValueAtTime(1800, this.ctx.currentTime);
-    lp.frequency.exponentialRampToValueAtTime(400, this.ctx.currentTime + dur);
-    const g = this.ctx.createGain();
-    g.gain.value = 0.35;
-    src.connect(lp); lp.connect(g); g.connect(this.gain);
-    src.start();
+    if (!this.quacks.length) return;
+    // Cloned so two ducks quacking at once do not cut each other off.
+    const el = this.quacks[Math.floor(Math.random() * this.quacks.length)].cloneNode();
+    el.volume = this.volume;
+    el.playbackRate = 0.93 + Math.random() * 0.14;   // stops repeats sounding identical
+    el.play().catch(e => console.error('Duck Pond: could not play quack', e));
   }
 };
 

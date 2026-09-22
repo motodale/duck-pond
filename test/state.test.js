@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { DuckPondState, shuffleInPlace } = require('../js/state.js');
+const { DuckPondState } = require('../js/state.js');
 
 function memStorage() {
   let store = {};
@@ -94,22 +94,46 @@ test('capacity is clamped to the 4..20 range', () => {
   s.setCapacity(99); assert.strictEqual(s.capacity, 20);
 });
 
-test('shuffling preserves the exact set of tasks', () => {
+test('a new task defaults to weight 1 and multiplier 1', () => {
   const s = fresh();
-  for (let i = 0; i < 20; i++) s.addTask('t' + i);
-  const before = s.tasks.map(t => t.id).sort();
-  s.shufflePile();
-  const after = s.tasks.map(t => t.id).sort();
-  assert.deepStrictEqual(after, before);
+  const t = s.addTask('plain');
+  assert.strictEqual(t.weight, 1);
+  assert.strictEqual(t.multiplier, 1);
 });
 
-test('shuffling the pile leaves pond and done tasks in place', () => {
+test('weight and multiplier are clamped to their ranges', () => {
+  const s = fresh();
+  const t = s.addTask('x', 999, 0);
+  assert.strictEqual(t.weight, 10);
+  assert.strictEqual(t.multiplier, 0.5);
+  s.setWeight(t.id, -4);
+  s.setMultiplier(t.id, 'nonsense');
+  assert.strictEqual(t.weight, 1);
+  assert.strictEqual(t.multiplier, 1);
+});
+
+test('takeFromPile draws in proportion to weight x multiplier', () => {
+  // heavy carries 10 x 5 = 50 of the 51 total, so a uniform stream of draws
+  // must land on it overwhelmingly more often than the 1 x 1 task.
+  let counts = { heavy: 0, light: 0 };
+  for (let i = 0; i < 400; i++) {
+    const s = new DuckPondState({ storage: memStorage(), rand: seeded(i + 1) });
+    s.addTask('light');
+    s.addTask('heavy', 10, 5);
+    counts[s.takeFromPile().text]++;
+  }
+  assert.ok(counts.heavy > counts.light * 10,
+    'heavy ' + counts.heavy + ' vs light ' + counts.light);
+  assert.ok(counts.light > 0, 'a weight-1 task must still be reachable');
+});
+
+test('takeFromPile never returns a pond or done task', () => {
   const s = fresh();
   for (let i = 0; i < 8; i++) s.addTask('t' + i);
-  const pondTask = s.takeFromPile();
-  const pondIndex = s.tasks.indexOf(pondTask);
-  s.shufflePile();
-  assert.strictEqual(s.tasks.indexOf(pondTask), pondIndex);
+  const drawn = [];
+  for (let i = 0; i < 8; i++) drawn.push(s.takeFromPile().id);
+  assert.strictEqual(new Set(drawn).size, 8);
+  assert.strictEqual(s.takeFromPile(), null);
 });
 
 test('a save and load round-trip preserves tasks and settings', () => {
@@ -143,6 +167,30 @@ test('corrupt storage does not throw and yields an empty pile', () => {
   }
 });
 
+test('clearHistory drops done tasks and keeps everything still in play', () => {
+  const s = fresh();
+  s.addTask('finished');
+  s.addTask('waiting');
+  const t = s.takeFromPile();
+  s.resolve(t.id, true);
+  assert.strictEqual(s.tasksIn('done').length, 1);
+
+  s.clearHistory();
+  assert.strictEqual(s.tasksIn('done').length, 0);
+  assert.strictEqual(s.tasks.length, 1);
+  assert.strictEqual(s.tasks[0].id, s.tasks.find(x => x.id !== t.id).id);
+});
+
+test('a cleared history stays cleared after a reload', () => {
+  const storage = memStorage();
+  const a = new DuckPondState({ storage, rand: seeded(1) });
+  a.addTask('finished');
+  a.resolve(a.takeFromPile().id, true);
+  a.clearHistory();
+  const b = new DuckPondState({ storage, rand: seeded(1) });
+  assert.strictEqual(b.tasks.length, 0);
+});
+
 test('deleteTask removes the task entirely', () => {
   const s = fresh();
   const t = s.addTask('a');
@@ -163,10 +211,47 @@ test('a brand-new state starts with the documented defaults', () => {
   assert.strictEqual(s.capacity, 12);
   assert.strictEqual(s.onDismiss, 'done');
   assert.strictEqual(s.volume, 0.7);
+  assert.strictEqual(s.ambience, 0.35);
 });
 
-test('shuffleInPlace keeps every element', () => {
-  const arr = [1, 2, 3, 4, 5, 6, 7, 8];
-  shuffleInPlace(arr, seeded(9));
-  assert.deepStrictEqual(arr.slice().sort((x, y) => x - y), [1, 2, 3, 4, 5, 6, 7, 8]);
+test('ambience volume is independent of quack volume, clamped, and saved', () => {
+  const storage = memStorage();
+  const a = new DuckPondState({ storage, rand: seeded(1) });
+  a.setAmbience(0);
+  a.setVolume(0.9);
+  assert.strictEqual(a.ambience, 0);
+  assert.strictEqual(a.volume, 0.9);
+
+  a.setAmbience(4);
+  assert.strictEqual(a.ambience, 1);
+
+  const b = new DuckPondState({ storage, rand: seeded(1) });
+  assert.strictEqual(b.ambience, 1);
+  assert.strictEqual(b.volume, 0.9);
+});
+
+test('a save from before ambience existed loads at the default', () => {
+  const storage = memStorage();
+  storage.setItem('duckpond', JSON.stringify({ tasks: [], volume: 0.9 }));
+  const s = new DuckPondState({ storage, rand: seeded(1) });
+  assert.strictEqual(s.ambience, 0.35);
+});
+
+test('weight and multiplier survive a save and load round-trip', () => {
+  const storage = memStorage();
+  const a = new DuckPondState({ storage, rand: seeded(1) });
+  a.addTask('weighted', 7, 2.5);
+  const b = new DuckPondState({ storage, rand: seeded(1) });
+  assert.strictEqual(b.tasks[0].weight, 7);
+  assert.strictEqual(b.tasks[0].multiplier, 2.5);
+});
+
+test('tasks saved before weight existed load with the defaults', () => {
+  const storage = memStorage();
+  storage.setItem('duckpond', JSON.stringify({
+    tasks: [{ id: 'a', text: 'old', state: 'pile', doneAt: null }]
+  }));
+  const s = new DuckPondState({ storage, rand: seeded(1) });
+  assert.strictEqual(s.tasks[0].weight, 1);
+  assert.strictEqual(s.tasks[0].multiplier, 1);
 });

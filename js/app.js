@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnDone = document.getElementById('btnDone');
     const btnNotNow = document.getElementById('btnNotNow');
     const emptyHint = document.getElementById('emptyHint');
+    const creditsDialog = document.getElementById('creditsDialog');
 
     let refillTimer = null;
 
@@ -54,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
       render();
     }
 
-    // Deleting a task whose duck is swimming sends that duck under immediately,
+    // Deleting a task whose duck is swimming sends that duck off immediately,
     // then refills the gap it leaves.
     function deleteTask(id) {
       const task = state.byId(id);
@@ -62,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const wasInPond = task.state === 'pond';
       if (state.heldId === id) { card.hidden = true; window.pond.release(); }
       state.deleteTask(id);
-      if (wasInPond) window.pond.removeByTaskId(id, 'dive');
+      if (wasInPond) window.pond.removeByTaskId(id);
       refill();
       render();
     }
@@ -71,7 +72,11 @@ document.addEventListener('DOMContentLoaded', () => {
     btnNotNow.addEventListener('click', () => hideCard(false));
 
     // Dismissing without choosing follows the On dismiss setting.
+    // A modal <dialog> closes itself on Escape but the key still reaches
+    // document, so without this guard closing the credits would also resolve
+    // whatever task the reveal card is holding.
     document.addEventListener('keydown', e => {
+      if (creditsDialog.open) return;
       if (e.key === 'Escape' && !card.hidden) hideCard(state.onDismiss === 'done');
     });
 
@@ -83,6 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // stop the duck spawning, the frame loop and the resize wiring that follow.
     if (window.audio) {
       window.audio.setVolume(state.volume);
+      window.audio.setAmbience(state.ambience);
       ['pointerdown', 'keydown'].forEach(ev => {
         document.addEventListener(ev, () => window.audio.unlock(), { once: true });
       });
@@ -108,15 +114,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const drawerToggle = document.getElementById('drawerToggle');
     const taskList = document.getElementById('taskList');
     const historyList = document.getElementById('historyList');
+    const clearHistoryBtn = document.getElementById('clearHistory');
     const capacityInput = document.getElementById('capacityInput');
     const capacityVal = document.getElementById('capacityVal');
     const dismissSelect = document.getElementById('dismissSelect');
     const volumeInput = document.getElementById('volumeInput');
     const volumeVal = document.getElementById('volumeVal');
+    const ambienceInput = document.getElementById('ambienceInput');
+    const ambienceVal = document.getElementById('ambienceVal');
     const addForm = document.getElementById('addForm');
     const addInput = document.getElementById('addInput');
+    const addWeight = document.getElementById('addWeight');
 
     const BADGE = { pond: 'in pond', pile: 'waiting', done: 'done' };
+
+    function numField(value, min, max, step, label, onInput) {
+      const el = document.createElement('input');
+      el.type = 'number';
+      el.className = 'num';
+      el.min = min; el.max = max; el.step = step;
+      el.value = value;
+      el.setAttribute('aria-label', label);
+      el.addEventListener('input', () => onInput(el.value));
+      return el;
+    }
 
     function render() {
       // Task list: everything still in play, pond tasks included. Opening this
@@ -144,13 +165,20 @@ document.addEventListener('DOMContentLoaded', () => {
           // re-rendering mid-keystroke would steal focus from the user.
           input.addEventListener('input', () => state.editTask(t.id, input.value));
 
+          // Committed on input like the text field above, and for the same
+          // reason: render() rebuilds this list and would discard a pending edit.
+          const weight = numField(t.weight, 1, 10, 1,
+            'Weight for: ' + t.text, v => state.setWeight(t.id, v));
+          const mult = numField(t.multiplier, 0.5, 5, 0.5,
+            'Multiplier for: ' + t.text, v => state.setMultiplier(t.id, v));
+
           const del = document.createElement('button');
           del.type = 'button';
           del.textContent = '✕';
           del.setAttribute('aria-label', 'Delete task: ' + t.text);
           del.addEventListener('click', () => deleteTask(t.id));
 
-          li.append(badge, input, del);
+          li.append(badge, input, weight, mult, del);
           taskList.appendChild(li);
         });
 
@@ -168,34 +196,56 @@ document.addEventListener('DOMContentLoaded', () => {
           historyList.appendChild(li);
         });
 
+      clearHistoryBtn.disabled = state.tasksIn('done').length === 0;
+
       capacityInput.value = state.capacity;
       capacityVal.textContent = state.capacity + ' ducks';
       dismissSelect.value = state.onDismiss;
       volumeInput.value = Math.round(state.volume * 100);
       volumeVal.textContent = Math.round(state.volume * 100) + '%';
+      ambienceInput.value = Math.round(state.ambience * 100);
+      ambienceVal.textContent = Math.round(state.ambience * 100) + '%';
       updateEmptyHint();
     }
 
+    function closeDrawer() {
+      drawer.hidden = true;
+      drawerToggle.setAttribute('aria-expanded', 'false');
+      drawerToggle.focus();
+    }
+
     drawerToggle.addEventListener('click', () => {
-      const open = drawer.hidden;
-      drawer.hidden = !open;
-      drawerToggle.setAttribute('aria-expanded', String(open));
-      if (open) drawer.querySelector('input, button, select').focus();
+      if (!drawer.hidden) { closeDrawer(); return; }
+      drawer.hidden = false;
+      drawerToggle.setAttribute('aria-expanded', 'true');
+      drawer.querySelector('input, button, select').focus();
     });
 
+    document.getElementById('drawerClose').addEventListener('click', closeDrawer);
+
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && !drawer.hidden) {
-        drawer.hidden = true;
-        drawerToggle.setAttribute('aria-expanded', 'false');
-        drawerToggle.focus();
-      }
+      if (creditsDialog.open) return;                // see the card handler above
+      if (e.key === 'Escape' && !drawer.hidden) closeDrawer();
     });
+
+    document.getElementById('creditsBtn')
+      .addEventListener('click', () => creditsDialog.showModal());
+    document.getElementById('creditsClose')
+      .addEventListener('click', () => creditsDialog.close());
 
     addForm.addEventListener('submit', e => {
       e.preventDefault();
-      if (!state.addTask(addInput.value)) return;
+      if (!state.addTask(addInput.value, addWeight.value)) return;
       addInput.value = '';
       refill();
+      render();
+    });
+
+    // Confirmed because it cannot be undone: history is the only record that a
+    // task ever existed, and there is no bin to fish it back out of.
+    clearHistoryBtn.addEventListener('click', () => {
+      if (!confirm('Clear the Done history? This cannot be undone.')) return;
+      state.clearHistory();
       render();
     });
 
@@ -204,6 +254,12 @@ document.addEventListener('DOMContentLoaded', () => {
     volumeInput.addEventListener('input', () => {
       state.setVolume(volumeInput.value / 100);
       if (window.audio) window.audio.setVolume(state.volume);
+      render();
+    });
+
+    ambienceInput.addEventListener('input', () => {
+      state.setAmbience(ambienceInput.value / 100);
+      if (window.audio) window.audio.setAmbience(state.ambience);
       render();
     });
 

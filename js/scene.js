@@ -3,6 +3,9 @@
 //
 // This is the tileset seam. Swapping to real pixel-art tiles means rewriting
 // buildStatic() and leaving water(), ripple(), draw() and resize() untouched.
+// One obligation comes with it: buildStatic() must still stamp every swimmable
+// pixel into the mask, because that mask is the ducks' entire idea of where
+// the water is. Draw water without stamping it and the ducks will not use it.
 
 const WATER = { cx: 0.5, cy: 0.58, rx: 0.42, ry: 0.33 };   // fractions of the stage
 const SHORE_PAD = 1.10;                                     // shore ellipse vs water
@@ -19,6 +22,7 @@ const scene = {
   cssW: 0, cssH: 0, sc: 3,
   logW: 0, logH: 0,
   static_: null,              // offscreen canvas holding the non-moving scene
+  mask: null,                 // 1 byte per logical pixel: is this water?
   rings: [],
   reduced: false,
 
@@ -53,10 +57,25 @@ const scene = {
     };
   },
 
-  contains(x, y) {
+  // Where a leaving duck climbs out: the left bank, at the height it is
+  // already swimming at. The factor lands it in the mud ring between the water
+  // edge (1.04) and the outer shore (SHORE_PAD), so it stands on brown.
+  shorePoint(y) {
     const w = this.water();
-    const dx = (x - w.cx) / w.rx, dy = (y - w.cy) / w.ry;
-    return dx * dx + dy * dy <= 1;
+    const f = (SHORE_PAD + 1.04) / 2;
+    const ry = w.ry * f;
+    const dy = Math.max(-1, Math.min(1, (y - w.cy) / ry));
+    return { x: w.cx - w.rx * f * Math.sqrt(1 - dy * dy), y: w.cy + ry * dy };
+  },
+
+  // Is this CSS-pixel point drawn as water? Read off the mask buildStatic
+  // captured, not computed from the ellipse — so when this file grows a real
+  // tileset, the ducks' bounds follow the new art with no maths to update.
+  isWater(x, y) {
+    if (!this.mask) return false;
+    const lx = Math.round(x / this.sc), ly = Math.round(y / this.sc);
+    if (lx < 0 || ly < 0 || lx >= this.logW || ly >= this.logH) return false;
+    return this.mask[ly * this.logW + lx] === 1;
   },
 
   ripple(x, y, o) {
@@ -90,16 +109,32 @@ const scene = {
     g.fillStyle = '#5d6b3a'; g.fillRect(0, 0, W, H);
     g.fillStyle = '#4c5a30'; g.fillRect(0, 0, W, Math.round(H * 0.22));
 
-    const ell = (ex, ey, erx, ery, fill) => {
+    // Anything drawn with isWater true is also stamped onto a scratch canvas,
+    // which becomes the swimmable mask. Capturing it here, before the lilypads
+    // and light bands go on, is what stops decoration punching holes in it.
+    const maskC = document.createElement('canvas');
+    maskC.width = W; maskC.height = H;
+    const mg = maskC.getContext('2d');
+
+    const ell = (ex, ey, erx, ery, fill, isWater) => {
       g.fillStyle = fill;
       g.beginPath(); g.ellipse(ex, ey, erx, ery, 0, 0, Math.PI * 2); g.fill();
+      if (!isWater) return;
+      mg.fillStyle = '#fff';
+      mg.beginPath(); mg.ellipse(ex, ey, erx, ery, 0, 0, Math.PI * 2); mg.fill();
     };
 
     // mud shore, then water
     ell(cx, cy, rx * SHORE_PAD, ry * SHORE_PAD, '#6d5a3c');
     ell(cx, cy, rx * 1.04, ry * 1.04, '#7b6743');
-    ell(cx, cy, rx, ry, '#3f6b5c');
-    ell(cx, cy - ry * 0.18, rx * 0.78, ry * 0.58, '#4a7a66');   // lighter centre
+    ell(cx, cy, rx, ry, '#3f6b5c', true);
+    ell(cx, cy - ry * 0.18, rx * 0.78, ry * 0.58, '#4a7a66', true);   // lighter centre
+
+    // Shapes only, never an image — drawing a sprite here would taint the
+    // canvas and make getImageData throw on file://.
+    const alpha = mg.getImageData(0, 0, W, H).data;
+    this.mask = new Uint8Array(W * H);
+    for (let i = 0; i < this.mask.length; i++) this.mask[i] = alpha[i * 4 + 3] > 0 ? 1 : 0;
 
     // light bands on the water
     g.fillStyle = 'rgba(226,240,228,.07)';
