@@ -29,6 +29,11 @@ const SHEETS = {
     frames: { swim: 2, waddle: 6, quack: 4, hurry: 6 },
     rare: false
   },
+  ducky4: {
+    src: 'assets/ducks/ducky_4_spritesheet.png',
+    frames: { swim: 2, waddle: 6, quack: 4, hurry: 6 },
+    rare: false
+  },
   gentleman: {
     src: 'assets/ducks/gentleman_ducky_sheet.png',
     frames: { swim: 2, waddle: 6, quack: 2, hurry: 6 },

@@ -169,9 +169,10 @@ broken on Node 24.
 |---|---|---|
 | `ducky_2_spritesheet.png` | https://caz-bee.itch.io/ducky-2 | CC0 |
 | `ducky_3_spritesheet.png` | https://caz-bee.itch.io/ducky-3 | CC0 |
+| `ducky_4_spritesheet.png` | Recolour of `ducky_3` by motodale | CC0 |
 | `gentleman_ducky_sheet.png` | https://caz-bee.itch.io/gentleman-ducky | No licence tag on the page |
 
-All three sprite sheets are by CazBee. The gentleman duck's itch.io page
+The sprite art is by CazBee; `ducky_4` is a recolour of `ducky_3`. The gentleman duck's itch.io page
 carries no licence tag; it only says "Go ahead and use this asset in any of
 your projects!", which permits use but is silent on redistribution. The
 repository owner has accepted this knowingly and owns resolving it.
