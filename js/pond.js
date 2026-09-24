@@ -233,7 +233,7 @@ const pond = {
       const d = this.ducks[i];
       d.t += dt;
 
-      if (d.mode === 'swim') this.stepSwim(d, i, dt, sc);
+      if (d.mode === 'swim') this.stepSwim(d, i, sc);
       else if (d.mode === 'enter') this.stepEnter(d, sc);
       else if (d.mode === 'quack') this.stepQuack(d);
       else if (d.mode === 'exit') { if (this.stepExit(d, sc, dt)) { d.el.remove(); this.ducks.splice(i, 1); continue; } }
@@ -245,7 +245,7 @@ const pond = {
     window.scene.draw();
   },
 
-  stepSwim(d, i, dt, sc) {
+  stepSwim(d, i, sc) {
     if (this.reduced) return;                 // ducks hold still, sprite still idles
 
     d.vx += (this.rand() - 0.5) * WANDER_X;

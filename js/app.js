@@ -113,6 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const drawer = document.getElementById('drawer');
     const drawerToggle = document.getElementById('drawerToggle');
     const taskList = document.getElementById('taskList');
+    const taskHead = document.getElementById('taskHead');
     const historyList = document.getElementById('historyList');
     const clearHistoryBtn = document.getElementById('clearHistory');
     const capacityInput = document.getElementById('capacityInput');
@@ -124,25 +125,63 @@ document.addEventListener('DOMContentLoaded', () => {
     const ambienceVal = document.getElementById('ambienceVal');
     const addForm = document.getElementById('addForm');
     const addInput = document.getElementById('addInput');
-    const addWeight = document.getElementById('addWeight');
+    const addCount = document.getElementById('addCount');
 
     const BADGE = { pond: 'in pond', pile: 'waiting', done: 'done' };
 
-    function numField(value, min, max, step, label, onInput) {
-      const el = document.createElement('input');
-      el.type = 'number';
-      el.className = 'num';
-      el.min = min; el.max = max; el.step = step;
-      el.value = value;
-      el.setAttribute('aria-label', label);
-      el.addEventListener('input', () => onInput(el.value));
+    // A dash means the step does not apply to this task: a waiting task has no
+    // "caught next" until it is drawn in, and one already in the pond has no
+    // "drawn in" left to do. A real 0% is different and does get shown.
+    // Precision scales with the size: a 200-task pile puts every row well
+    // under 1%, and rounding those all the same way would hide a weight edit.
+    function setChance(el, p) {
+      el.classList.toggle('na', p == null);
+      if (p == null) { el.textContent = '—'; return; }
+      const n = p * 100;
+      el.textContent =
+        n === 0 ? '0%' :
+        n >= 10 ? Math.round(n) + '%' :
+        n >= 1 ? n.toFixed(1) + '%' :
+        n >= 0.01 ? n.toFixed(2) + '%' : '<0.01%';
+    }
+
+    function chanceCell(p) {
+      const el = document.createElement('span');
+      el.className = 'badge chance';
+      setChance(el, p);
       return el;
+    }
+
+    // Task id -> its "Drawn in" cell. A weight edit must not call render(),
+    // which rebuilds the list and would throw focus out of the box being typed
+    // in, so that column is rewritten through these instead. "Caught next" is
+    // not here: weight has no say in which duck you click.
+    const drawnEls = new Map();
+    function refreshDrawn() {
+      const drawn = state.drawChances();
+      drawnEls.forEach((el, id) => setChance(el, drawn[id]));
+    }
+
+    // Backs up the "Drawn in" column: a task alone in the pile reads 100%
+    // whatever weight you give it, so without this an edit could look dead.
+    // One element at a time — two
+    // quick edits in different rows would otherwise leave the first stuck lit.
+    let savedEl = null, savedTimer = null;
+    function flashSaved(el) {
+      if (savedEl) savedEl.classList.remove('saved');
+      savedEl = el;
+      el.classList.add('saved');
+      clearTimeout(savedTimer);
+      savedTimer = setTimeout(() => { el.classList.remove('saved'); savedEl = null; }, 600);
     }
 
     function render() {
       // Task list: everything still in play, pond tasks included. Opening this
       // drawer is what spoils the surprise, which is why it starts closed.
-      taskList.replaceChildren();
+      taskList.replaceChildren(taskHead);       // the sticky column header stays
+      drawnEls.clear();
+      const drawn = state.drawChances();
+      const caught = state.revealChances();
       state.tasks
         .filter(t => t.state !== 'done')
         .forEach(t => {
@@ -167,10 +206,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
           // Committed on input like the text field above, and for the same
           // reason: render() rebuilds this list and would discard a pending edit.
-          const weight = numField(t.weight, 1, 10, 1,
-            'Weight for: ' + t.text, v => state.setWeight(t.id, v));
-          const mult = numField(t.multiplier, 0.5, 5, 0.5,
-            'Multiplier for: ' + t.text, v => state.setMultiplier(t.id, v));
+          const weight = document.createElement('input');
+          weight.type = 'number';
+          weight.className = 'num';
+          weight.min = 1; weight.max = 10; weight.step = 1;
+          weight.value = t.weight;
+          weight.setAttribute('aria-label', 'Weight for: ' + t.text);
+          weight.addEventListener('input', () => {
+            state.setWeight(t.id, weight.value);
+            refreshDrawn();          // every waiting row's share moves, not just this one
+            flashSaved(weight);
+          });
 
           const del = document.createElement('button');
           del.type = 'button';
@@ -178,7 +224,10 @@ document.addEventListener('DOMContentLoaded', () => {
           del.setAttribute('aria-label', 'Delete task: ' + t.text);
           del.addEventListener('click', () => deleteTask(t.id));
 
-          li.append(badge, input, weight, mult, del);
+          const drawnCell = chanceCell(drawn[t.id]);
+          drawnEls.set(t.id, drawnCell);
+
+          li.append(badge, input, weight, drawnCell, chanceCell(caught[t.id]), del);
           taskList.appendChild(li);
         });
 
@@ -209,6 +258,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function closeDrawer() {
+      // Percentages already track weight edits live. This is for the rest of
+      // the row: a duck caught while the drawer was open has changed a badge
+      // from "waiting" to "in pond", and may have filled the Done list.
+      render();
       drawer.hidden = true;
       drawerToggle.setAttribute('aria-expanded', 'false');
       drawerToggle.focus();
@@ -235,7 +288,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     addForm.addEventListener('submit', e => {
       e.preventDefault();
-      if (!state.addTask(addInput.value, addWeight.value)) return;
+      if (!state.addTask(addInput.value, addCount.value)) return;
+      addCount.value = 1;                     // one is the common case; do not make them reset it
       addInput.value = '';
       refill();
       render();

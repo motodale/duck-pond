@@ -6,6 +6,13 @@
   --accent: #ffd479;
   --card-bg: rgba(28, 24, 18, .95);
   --line: rgba(255, 255, 255, .16);
+
+  /* Task list columns. In px, not em, so the header (10px) and the rows
+     (16px inputs) line up instead of each scaling to its own font size. */
+  --col-state: 58px;
+  --col-num: 68px;
+  --col-chance: 66px;
+  --col-del: 38px;
 }
 
 * { box-sizing: border-box; }
@@ -95,7 +102,7 @@ button, select, input[type="text"], input[type="number"] {
 }
 button:hover { background: rgba(255, 255, 255, .17); }
 input[type="text"] { cursor: text; }
-.num { width: 4.4em; flex: none; padding: 7px 4px 7px 8px; text-align: right; cursor: text; }
+.num { width: var(--col-num); flex: none; padding: 7px 4px 7px 8px; text-align: right; cursor: text; }
 
 /* A third of the width, hard left. The floor keeps it usable on a phone,
    where a third of the screen would not fit the field and its two buttons. */
@@ -109,7 +116,7 @@ input[type="text"] { cursor: text; }
 /* The drawer covers the topbar, so it carries its own close button — the
    toggle that opened it is underneath the panel and unclickable. */
 #drawer {
-  position: fixed; top: 0; right: 0; bottom: 0; width: min(640px, 92vw);
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(780px, 92vw);
   background: var(--panel); border-left: 1px solid var(--line);
   padding: 16px; z-index: 50;
   display: flex; flex-direction: column; overflow: hidden;
@@ -126,6 +133,20 @@ input[type="text"] { cursor: text; }
   flex: 1 1 0; min-height: 90px; overflow-y: auto;
   border: 1px solid var(--line); border-radius: 8px;
 }
+/* Picks up the row layout from #taskList li above, so its cells line up with
+   the real rows for free. */
+#taskHead {
+  position: sticky; top: 0; z-index: 1;
+  align-items: flex-end; background: var(--panel);
+  font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--ink-dim);
+}
+#taskHead .c-state { width: var(--col-state); flex: none; }
+#taskHead .c-task { flex: 1; min-width: 0; }
+#taskHead .c-num { width: var(--col-num); flex: none; text-align: center; }
+#taskHead .c-chance { width: var(--col-chance); flex: none; text-align: center; line-height: 1.2; }
+#taskHead .c-del { width: var(--col-del); flex: none; }
+#taskHead [title] { cursor: help; border-bottom: 1px dotted var(--line); }
 #taskList li, #historyList li {
   display: flex; align-items: center; gap: 8px;
   padding: 7px 0; border-bottom: 1px solid var(--line);
@@ -134,8 +155,21 @@ input[type="text"] { cursor: text; }
   font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
   color: var(--ink-dim); border: 1px solid var(--line);
   border-radius: 5px; padding: 1px 6px; flex: none;
+  width: var(--col-state); text-align: center;
 }
 #taskList li input[type="text"] { flex: 1; min-width: 0; }
+#taskList li .chance {
+  width: var(--col-chance); text-align: center; color: var(--accent);
+  border-color: transparent; padding: 1px 2px;
+}
+#taskList li .chance.na { color: var(--ink-dim); }
+#taskList li > button { width: var(--col-del); flex: none; padding: 7px 0; }
+/* Snaps on, fades off — the pulse that confirms a weight edit landed. */
+#taskList li .num { transition: box-shadow .5s ease, border-color .5s ease; }
+#taskList li .num.saved {
+  border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent);
+  transition-duration: 0s;
+}
 #drawer label { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
 #clearHistory { flex: none; align-self: flex-start; margin-top: 10px; }
 #clearHistory[disabled] { opacity: .45; cursor: default; }

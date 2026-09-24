@@ -94,35 +94,58 @@ test('capacity is clamped to the 4..20 range', () => {
   s.setCapacity(99); assert.strictEqual(s.capacity, 20);
 });
 
-test('a new task defaults to weight 1 and multiplier 1', () => {
+test('a new task defaults to weight 1', () => {
   const s = fresh();
-  const t = s.addTask('plain');
-  assert.strictEqual(t.weight, 1);
-  assert.strictEqual(t.multiplier, 1);
+  assert.strictEqual(s.addTask('plain').weight, 1);
 });
 
-test('weight and multiplier are clamped to their ranges', () => {
+test('weight is clamped to its range', () => {
   const s = fresh();
-  const t = s.addTask('x', 999, 0);
+  const t = s.addTask('x');
+  s.setWeight(t.id, 999);
   assert.strictEqual(t.weight, 10);
-  assert.strictEqual(t.multiplier, 0.5);
   s.setWeight(t.id, -4);
-  s.setMultiplier(t.id, 'nonsense');
   assert.strictEqual(t.weight, 1);
-  assert.strictEqual(t.multiplier, 1);
+  s.setWeight(t.id, 'nonsense');
+  assert.strictEqual(t.weight, 1);
 });
 
-test('takeFromPile draws in proportion to weight x multiplier', () => {
-  // heavy carries 10 x 5 = 50 of the 51 total, so a uniform stream of draws
-  // must land on it overwhelmingly more often than the 1 x 1 task.
+test('a count adds that many independent tasks with the same text', () => {
+  const s = fresh();
+  s.addTask('wash a dish', 200);
+  const pile = s.tasksIn('pile');
+  assert.strictEqual(pile.length, 200);
+  assert.strictEqual(new Set(pile.map(t => t.id)).size, 200, 'each gets its own id');
+  assert.ok(pile.every(t => t.text === 'wash a dish' && t.weight === 1));
+
+  // Resolving one leaves the other 199 alone.
+  s.resolve(s.takeFromPile().id, true);
+  assert.strictEqual(s.tasksIn('pile').length, 199);
+  assert.strictEqual(s.tasksIn('done').length, 1);
+});
+
+test('a count is rounded, floored at 1 and capped', () => {
+  const one = fresh(); one.addTask('a', 0);
+  assert.strictEqual(one.tasks.length, 1, 'zero or less still adds one');
+  const frac = fresh(); frac.addTask('a', 2.6);
+  assert.strictEqual(frac.tasks.length, 3, 'rounded, not truncated');
+  const junk = fresh(); junk.addTask('a', 'lots');
+  assert.strictEqual(junk.tasks.length, 1);
+  const huge = fresh(); huge.addTask('a', 100000);
+  assert.strictEqual(huge.tasks.length, 500, 'capped at COUNT_MAX');
+});
+
+test('takeFromPile draws in proportion to weight', () => {
+  // heavy carries 10 of the 11 total, so a uniform stream of draws must land
+  // on it far more often than the weight-1 task.
   let counts = { heavy: 0, light: 0 };
   for (let i = 0; i < 400; i++) {
     const s = new DuckPondState({ storage: memStorage(), rand: seeded(i + 1) });
     s.addTask('light');
-    s.addTask('heavy', 10, 5);
+    s.setWeight(s.addTask('heavy').id, 10);
     counts[s.takeFromPile().text]++;
   }
-  assert.ok(counts.heavy > counts.light * 10,
+  assert.ok(counts.heavy > counts.light * 4,
     'heavy ' + counts.heavy + ' vs light ' + counts.light);
   assert.ok(counts.light > 0, 'a weight-1 task must still be reachable');
 });
@@ -191,6 +214,50 @@ test('a cleared history stays cleared after a reload', () => {
   assert.strictEqual(b.tasks.length, 0);
 });
 
+test('revealChances splits evenly across the pond', () => {
+  const s = fresh();
+  s.addTask('a'); s.addTask('b'); s.addTask('c'); s.addTask('d');
+  const p1 = s.takeFromPile(), p2 = s.takeFromPile();
+  const ch = s.revealChances();
+
+  assert.strictEqual(ch[p1.id], 0.5);
+  assert.strictEqual(ch[p2.id], 0.5);
+});
+
+test('revealChances ignores weight, which only decides the pond draw', () => {
+  const s = fresh();
+  const heavy = s.addTask('heavy');
+  const light = s.addTask('light');
+  s.setWeight(heavy.id, 10);
+  s.takeFromPile(); s.takeFromPile();          // both into the pond
+
+  const ch = s.revealChances();
+  assert.strictEqual(ch[heavy.id], ch[light.id],
+    'once both are ducks, clicking either is an even coin flip');
+});
+
+test('a waiting task is 0: it cannot be revealed before it is drawn in', () => {
+  const s = fresh();
+  s.addTask('waiting one'); s.addTask('waiting two');
+  const pond = s.takeFromPile();
+  const ch = s.revealChances();
+
+  assert.strictEqual(ch[pond.id], 1);
+  assert.strictEqual(ch[s.tasksIn('pile')[0].id], 0);
+});
+
+test('revealChances leaves out done tasks and survives an empty pond', () => {
+  const s = fresh();
+  s.addTask('one');
+  const done = s.takeFromPile();
+  s.resolve(done.id, true);
+
+  const ch = s.revealChances();
+  assert.ok(!(done.id in ch), 'a done task is not in the running');
+  assert.deepStrictEqual(ch, {}, 'nothing left in play');
+  assert.deepStrictEqual(fresh().revealChances(), {});
+});
+
 test('deleteTask removes the task entirely', () => {
   const s = fresh();
   const t = s.addTask('a');
@@ -237,13 +304,12 @@ test('a save from before ambience existed loads at the default', () => {
   assert.strictEqual(s.ambience, 0.35);
 });
 
-test('weight and multiplier survive a save and load round-trip', () => {
+test('weight survives a save and load round-trip', () => {
   const storage = memStorage();
   const a = new DuckPondState({ storage, rand: seeded(1) });
-  a.addTask('weighted', 7, 2.5);
+  a.setWeight(a.addTask('weighted').id, 7);
   const b = new DuckPondState({ storage, rand: seeded(1) });
   assert.strictEqual(b.tasks[0].weight, 7);
-  assert.strictEqual(b.tasks[0].multiplier, 2.5);
 });
 
 test('tasks saved before weight existed load with the defaults', () => {
@@ -253,5 +319,4 @@ test('tasks saved before weight existed load with the defaults', () => {
   }));
   const s = new DuckPondState({ storage, rand: seeded(1) });
   assert.strictEqual(s.tasks[0].weight, 1);
-  assert.strictEqual(s.tasks[0].multiplier, 1);
 });

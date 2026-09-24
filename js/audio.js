@@ -7,17 +7,16 @@
 const QUACKS = ['assets/audio/quack-1.ogg', 'assets/audio/quack-2.ogg', 'assets/audio/quack-3.ogg'];
 const AMBIENCE = 'assets/audio/pond-ambience.ogg';
 
-const clamp01 = v => Math.max(0, Math.min(1, v));
-
 const audio = {
   quacks: [], ambience: null, volume: 0.7, ambienceVolume: 0.35,
 
-  setVolume(v) { this.volume = clamp01(v); },
+  // Both setters take an already-clamped 0..1 from state.js.
+  setVolume(v) { this.volume = v; },
 
   // Its own control, not a ratio of the quack volume: the ambience runs
   // constantly and some people want it off while the quacks stay on.
   setAmbience(v) {
-    this.ambienceVolume = clamp01(v);
+    this.ambienceVolume = v;
     if (this.ambience) this.ambience.volume = this.ambienceVolume;
   },
 

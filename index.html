@@ -31,8 +31,8 @@
 <form id="addForm" autocomplete="off">
   <label class="visually-hidden" for="addInput">Add a task</label>
   <input id="addInput" type="text" maxlength="100" placeholder="Add a task…">
-  <label class="visually-hidden" for="addWeight">Weight</label>
-  <input id="addWeight" class="num" type="number" min="1" max="10" step="1" value="1" title="Weight: how likely a duck is to bring this one">
+  <label class="visually-hidden" for="addCount">How many</label>
+  <input id="addCount" class="num" type="number" min="1" max="500" step="1" value="1" title="How many of this task to add. 200 makes 200 separate tasks.">
   <button type="submit">Add</button>
 </form>
 
@@ -41,8 +41,25 @@
 
   <section>
     <h2>Tasks</h2>
-    <p class="drawer-note">Every task, including the ones ducks are hiding. The two numbers are weight and multiplier: their product is how likely a task is to be drawn next.</p>
-    <ul id="taskList"></ul>
+    <p class="drawer-note">Every task, including the ones ducks are hiding.
+    Getting a task happens in two steps, and there is a column for each:
+    <strong>Drawn in</strong> is its chance of being the next one pulled off
+    the pile into the pond, which is what weight controls.
+    <strong>Caught next</strong> is its chance of being the next one a duck
+    actually hands you. A dash means the step does not apply yet.</p>
+    <ul id="taskList">
+      <!-- Lives inside the list, not above it: as a sticky row it inherits the
+           same content width, so it cannot drift out of line when a scrollbar
+           appears, and it stays on screen while you scroll. -->
+      <li id="taskHead" aria-hidden="true">
+        <span class="c-state"></span>
+        <span class="c-task">Task</span>
+        <span class="c-num" title="How much you want this task to come up">Weight</span>
+        <span class="c-chance" title="Chance this is the next task drawn off the pile into the pond. This is what weight controls.">Drawn in</span>
+        <span class="c-chance" title="Chance this is the next task a duck hands you. An even split across the ducks on the water.">Caught next</span>
+        <span class="c-del"></span>
+      </li>
+    </ul>
   </section>
 
   <section>
@@ -98,7 +115,7 @@
       <span class="lic">no licence tag</span></li>
   </ul>
   <p class="credits-note">The gentleman duck&rsquo;s page carries no licence tag.
-  It says only &ldquo;Go ahead and use this asset in any of your projects&rdquo;, I'm assuming it matches the previous ducks
+  It says only &ldquo;Go ahead and use this asset in any of your projects&rdquo;, I'm assuming it matches the previous ducks.</p>
 
   <h3>Sound</h3>
   <ul class="credits">

@@ -26,7 +26,7 @@ Then visit `http://localhost:8000`.
 | ✓ Done | Marks the revealed task done and moves it to Done history |
 | ↩ Not now | Returns the task to the pile; it may surface again in a later duck |
 | Escape (with the card open) | Dismisses the card without choosing a button; follows the **On dismiss** setting in the drawer (done, or back to the pile) |
-| Add a task (bottom bar) | Adds a new task at the weight in the box beside it; a duck brings it into the pond |
+| Add a task (bottom bar) | Adds the task. The box beside it is **how many** — put 200 in it and you get 200 separate tasks. A duck brings each one into the pond in its own time |
 | Tasks & settings (top bar) | Opens the drawer: full task list, settings, Done history |
 | ✕ (in the drawer) | Closes the drawer. The drawer covers the top bar, so the button that opened it is not reachable while it is open |
 | Clear history (in the drawer) | Deletes every task in the Done list. Asks first, because it cannot be undone. Tasks still in the pond or the pile are not touched. The button is disabled when the history is already empty |
@@ -48,24 +48,75 @@ duck or chase one down.
 The task list and the Done history each scroll inside their own box, so the
 drawer never grows past the height of the screen.
 
-## Weight and multiplier
+## How many, and weight
 
-Which task a duck brings in next is a random draw, but not an even one. Each
-task carries two numbers, both editable in the drawer's task list:
+### How many
+
+The box beside the "Add a task" field is a quantity. If you have 200 dishes
+to wash, type the task once, put 200 in the box, and you get 200 tasks.
+
+They are 200 genuinely separate tasks, not one task with a counter. Each has
+its own row in the drawer, gets caught by its own duck, and gets its own line
+in the Done history. You can delete or re-weight any one of them without
+touching the rest. The box resets to 1 after each add, since one is the usual
+case.
+
+The cap is 500 per add. That is not a taste judgement: each one is a real
+task in `localStorage`, and an accidental extra zero would otherwise hang the
+browser.
+
+### Weight
+
+Which task a duck brings in next is a random draw, but not an even one. Every
+task carries a weight, editable in the drawer's task list:
 
 | Number | Range | Default | What it is |
 |---|---|---|---|
-| Weight | 1–10, whole numbers | 1 | How much you want this task to come up |
-| Multiplier | 0.5–5, in steps of 0.5 | 1 | A second factor on top of weight — use it to push a whole task up or down without losing the weight you gave it |
+| Weight | 1-10, whole numbers | 1 | How much you want this task to come up |
 
-A task's chance of being drawn is its **weight × multiplier**, measured
-against the same product for every other task in the pile. A task at 10 × 5
-is 50 times as likely to come up as a task at 1 × 1, but the 1 × 1 task is
-never impossible — it only has to wait longer.
+A task's chance of being drawn is its weight measured against the total
+weight of every other task in the pile. A task at 10 is ten times as likely
+to come up as a task at 1, but the task at 1 is never impossible - it only
+has to wait longer.
 
-Set a weight when you add a task using the box beside the "Add a task" field.
-Change either number later in the drawer. Tasks saved before these numbers
-existed load at 1 and 1, so nothing you already had changes behaviour.
+Weight is deliberately only in the drawer. It is the considered setting, so
+it lives with the rest of the task settings rather than on the bar you type
+into every day.
+
+Note what this means for a batch: 200 dishes at weight 1 each are individually
+no more likely than your one weight-1 email, but as a group they are most of
+the pile, so dishes will come up often. That is honest - they are most of your
+outstanding work.
+
+### Seeing the odds
+
+Getting a task out of the pond happens in two steps, and the drawer's list
+has a labelled column for each:
+
+| Column | What it is |
+|---|---|
+| **Drawn in** | The chance this is the next task pulled off the waiting pile into the pond. This is the step weight controls. |
+| **Caught next** | The chance this is the next task a duck actually hands you. You pick a duck, and one duck is as good as another, so it is an even split across the ducks on the water. |
+
+A task is either waiting or in the pond, never both, so every row has a figure
+in exactly one column and a dash in the other. The dash means that step does
+not apply: a waiting task has no "caught next" until it has been drawn in, and
+a task already in the pond has no "drawn in" left to do.
+
+A dash is not the same as `0%`. A waiting task reads a real `0%` under
+"Caught next" — it genuinely cannot be the next one revealed. Twelve ducks on
+the water means each of them reads 8%.
+
+Precision follows the size of the number: `33%`, `4.8%`, `0.48%`. That matters
+with a large batch, because 200 tasks put every row well under 1% and rounding
+them all the same way would hide the effect of a weight edit.
+
+Editing a weight changes the "Drawn in" column for every waiting task at once,
+since they all share out the same total. The box you edited also lights up for
+a moment to confirm it saved.
+
+Tasks saved before weight existed load at 1, so nothing you already had
+changes behaviour.
 
 ## Sound
 
